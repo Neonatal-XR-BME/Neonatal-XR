@@ -69,9 +69,9 @@ const styles = StyleSheet.create({
     lineHeight: -20,
   },
   text: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: fontFamily.medium,
-    lineHeight: 0,
+    lineHeight: 16,
     color: "#A0A0A0",
   },
   highlight: {

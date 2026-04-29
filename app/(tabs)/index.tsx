@@ -1,7 +1,9 @@
+import HumidityCard from "@/components/humidity-card";
+import { SetPointCard } from "@/components/setpoint-temperature";
 import { TemperatureCard } from "@/components/temperature-card";
 import { fontFamily } from "@/constants/fontFamily";
 import { CloudAdd } from "iconsax-react-nativejs";
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
@@ -20,7 +22,11 @@ export default function HomeScreen() {
             <CloudAdd variant="Bold" color="#01885B" size={28} />
           </View>
           {/* Temperature Cards */}
-          <View style={styles.monitorData}>
+          <ScrollView
+            style={styles.monitorScroll}
+            contentContainerStyle={styles.monitorData}
+            showsVerticalScrollIndicator={false}
+          >
             <TemperatureCard
               title="CORE TEMPERATURE"
               temperature={36.5}
@@ -31,7 +37,13 @@ export default function HomeScreen() {
               temperature={24.5}
               state="normal"
             />
-          </View>
+            <HumidityCard title="HUMIDITY" humidity={45} state="normal" />
+            <SetPointCard
+              title="SETPOINT TEMPERATURE"
+              temperature={36.3}
+              state="normal"
+            />
+          </ScrollView>
         </View>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -40,9 +52,9 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: "#F4F4F8",
     padding: 16,
+    justifyContent: "space-between",
   },
   upperPart: {
     flexDirection: "row",
@@ -70,10 +82,11 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 2,
   },
-  monitorData: {
+  monitorScroll: {
     marginTop: 20,
-    flexDirection: "column",
+  },
+  monitorData: {
     gap: 12,
-    height: "100%",
+    paddingBottom: 80, // so last card isn't hidden by tab bar
   },
 });
