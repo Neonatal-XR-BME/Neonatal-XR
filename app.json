@@ -28,6 +28,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": true,
+          "barStyle": "dark-content",
+          "visiblility": "visible"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",

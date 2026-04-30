@@ -74,7 +74,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontFamily: fontFamily.semibold,
     letterSpacing: -0.5,
-    lineHeight: -20,
   },
   text: {
     fontSize: 12,

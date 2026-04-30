@@ -54,6 +54,7 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: "#F4F4F8",
     padding: 16,
+    flex: 1,
     justifyContent: "space-between",
   },
   upperPart: {
@@ -87,6 +88,6 @@ const styles = StyleSheet.create({
   },
   monitorData: {
     gap: 12,
-    paddingBottom: 80, // so last card isn't hidden by tab bar
+    paddingBottom: 40, // so last card isn't hidden by tab bar
   },
 });

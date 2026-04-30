@@ -72,14 +72,13 @@ const styles = StyleSheet.create({
   unit: {
     fontSize: 14,
     fontFamily: fontFamily.medium,
-    lineHeight: 0,
+
     marginTop: 4,
   },
   value: {
     fontSize: 28,
     fontFamily: fontFamily.semibold,
     letterSpacing: -0.5,
-    lineHeight: -20,
   },
   text: {
     fontSize: 12,
