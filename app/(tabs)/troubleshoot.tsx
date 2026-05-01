@@ -14,7 +14,7 @@ export default function Troubleshoot() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
-        <View>
+        <View style={{ flex: 1 }}>
           {/* Tab Switch */}
           <View style={styles.tabContainer}>
             <View
@@ -60,7 +60,7 @@ export default function Troubleshoot() {
               </Text>
             </View>
           </View>
-          <View>
+          <View style={{ flex: 1 }}>
             {/* Content based on active tab */}
             {activeTab === "circuitry" && <Circuitry />}
             {activeTab === "safety" && <SafetyAlarms />}
@@ -75,7 +75,8 @@ export default function Troubleshoot() {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "#F4F4F8",
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 24,
     flex: 1,
     justifyContent: "space-between",
   },

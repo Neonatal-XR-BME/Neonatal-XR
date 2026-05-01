@@ -3,7 +3,7 @@ import { DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { SplashScreen, Stack } from "expo-router";
 
-import { StatusBar } from "react-native";
+import { Platform, StatusBar } from "react-native";
 import "react-native-reanimated";
 
 export const unstable_settings = {
@@ -39,7 +39,7 @@ export default function RootLayout() {
       <StatusBar
         animated={true}
         backgroundColor="#222222"
-        barStyle="dark-content"
+        barStyle={Platform?.OS === "android" ? "light-content" : "dark-content"}
       />
     </ThemeProvider>
   );

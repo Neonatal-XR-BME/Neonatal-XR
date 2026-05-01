@@ -1,22 +1,75 @@
 import { fontFamily } from "@/constants/fontFamily";
+import {
+  Electricity,
+  Flash,
+  Lamp,
+  SafeHome,
+  Setting,
+} from "iconsax-react-nativejs";
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import DetailsCard from "./details-card";
+
+const circuitryData = [
+  {
+    id: "1",
+    icon: <Lamp size={24} color="#0749FF" variant="Bold" />,
+    cardTitle: "Heater Switch State",
+    cardData: "Online",
+  },
+  {
+    id: "2",
+    icon: <Flash size={24} color="#0749FF" variant="Bold" />,
+    cardTitle: "Heater Effort Level",
+    cardData: "98%",
+  },
+  {
+    id: "3",
+    icon: <SafeHome size={24} color="#0749FF" variant="Bold" />,
+    cardTitle: "Voltage Leakage",
+    cardData: "Active",
+  },
+  {
+    id: "4",
+    icon: <Electricity size={24} color="#0749FF" variant="Bold" />,
+    cardTitle: "Input Power Source",
+    cardData: "Active",
+  },
+  {
+    id: "5",
+    icon: <Setting size={24} color="#0749FF" variant="Bold" />,
+    cardTitle: "Fuse Status",
+    cardData: "Active",
+  },
+];
 
 export default function Circuitry() {
   return (
-    <View>
-      <View>
-        <View style={styles.box}>
-          <View style={styles.textBox}>
-            <Text style={styles.textHeader}>System Circuitry</Text>
-            <Text style={styles.text}>Last Synced - 1 min ago</Text>
-          </View>
-
-          <Pressable style={styles.button} onPress={() => {}}>
-            <Text style={styles.buttonText}>Sync Data</Text>
-          </Pressable>
+    <View style={styles.container}>
+      <View style={styles.box}>
+        <View style={styles.textBox}>
+          <Text style={styles.textHeader}>System Circuitry</Text>
+          <Text style={styles.text}>Last Synced - 1 min ago</Text>
         </View>
+
+        <Pressable style={styles.button} onPress={() => {}}>
+          <Text style={styles.buttonText}>Sync Data</Text>
+        </Pressable>
       </View>
+      <ScrollView
+        style={styles.cardContainer}
+        contentContainerStyle={styles.cardContainerContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {circuitryData.map((item) => (
+          <DetailsCard
+            key={item.id}
+            icon={item.icon}
+            cardTitle={item.cardTitle}
+            cardData={item.cardData}
+          />
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -58,5 +111,12 @@ const styles = StyleSheet.create({
     color: "#0749FF",
     fontSize: 14,
     fontFamily: fontFamily.medium,
+  },
+  cardContainer: {
+    marginTop: 20,
+  },
+  cardContainerContent: {
+    gap: 16,
+    paddingBottom: 20,
   },
 });
