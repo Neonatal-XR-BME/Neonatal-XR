@@ -1,5 +1,6 @@
 import Circuitry from "@/components/circuitry";
 import SafetyAlarms from "@/components/safety-alarm";
+import SwipeableScreen from "@/components/swipeablewrapper";
 import System from "@/components/system";
 import { fontFamily } from "@/constants/fontFamily";
 import React, { useState } from "react";
@@ -13,61 +14,65 @@ export default function Troubleshoot() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1 }}>
-          {/* Tab Switch */}
-          <View style={styles.tabContainer}>
-            <View
-              style={[
-                styles.tab,
-                activeTab === "circuitry" && styles.activeTab,
-              ]}
-              onTouchEnd={() => setActiveTab("circuitry")}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  { color: activeTab === "circuitry" ? "#FFFFFF" : "#7D7D7D" },
-                ]}
-              >
-                Circuitry
-              </Text>
-            </View>
-            <View
-              style={[styles.tab, activeTab === "safety" && styles.activeTab]}
-              onTouchEnd={() => setActiveTab("safety")}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  { color: activeTab === "safety" ? "#FFFFFF" : "#7D7D7D" },
-                ]}
-              >
-                Safety Alarm
-              </Text>
-            </View>
-            <View
-              style={[styles.tab, activeTab === "system" && styles.activeTab]}
-              onTouchEnd={() => setActiveTab("system")}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  { color: activeTab === "system" ? "#FFFFFF" : "#7D7D7D" },
-                ]}
-              >
-                System Info
-              </Text>
-            </View>
-          </View>
+      <SwipeableScreen>
+        <SafeAreaView style={styles.container}>
           <View style={{ flex: 1 }}>
-            {/* Content based on active tab */}
-            {activeTab === "circuitry" && <Circuitry />}
-            {activeTab === "safety" && <SafetyAlarms />}
-            {activeTab === "system" && <System />}
+            {/* Tab Switch */}
+            <View style={styles.tabContainer}>
+              <View
+                style={[
+                  styles.tab,
+                  activeTab === "circuitry" && styles.activeTab,
+                ]}
+                onTouchEnd={() => setActiveTab("circuitry")}
+              >
+                <Text
+                  style={[
+                    styles.tabText,
+                    {
+                      color: activeTab === "circuitry" ? "#FFFFFF" : "#7D7D7D",
+                    },
+                  ]}
+                >
+                  Circuitry
+                </Text>
+              </View>
+              <View
+                style={[styles.tab, activeTab === "safety" && styles.activeTab]}
+                onTouchEnd={() => setActiveTab("safety")}
+              >
+                <Text
+                  style={[
+                    styles.tabText,
+                    { color: activeTab === "safety" ? "#FFFFFF" : "#7D7D7D" },
+                  ]}
+                >
+                  Safety Alarm
+                </Text>
+              </View>
+              <View
+                style={[styles.tab, activeTab === "system" && styles.activeTab]}
+                onTouchEnd={() => setActiveTab("system")}
+              >
+                <Text
+                  style={[
+                    styles.tabText,
+                    { color: activeTab === "system" ? "#FFFFFF" : "#7D7D7D" },
+                  ]}
+                >
+                  System Info
+                </Text>
+              </View>
+            </View>
+            <View style={{ flex: 1 }}>
+              {/* Content based on active tab */}
+              {activeTab === "circuitry" && <Circuitry />}
+              {activeTab === "safety" && <SafetyAlarms />}
+              {activeTab === "system" && <System />}
+            </View>
           </View>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </SwipeableScreen>
     </SafeAreaProvider>
   );
 }

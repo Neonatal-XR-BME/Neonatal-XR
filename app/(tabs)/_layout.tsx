@@ -21,9 +21,8 @@ export default function TabLayout() {
           paddingHorizontal: 16,
         },
         tabBarLabelStyle: {
-          fontFamily: fontFamily.semibold,
+          fontFamily: fontFamily.medium,
           fontSize: 11,
-          letterSpacing: -0.5,
         },
       }}
     >

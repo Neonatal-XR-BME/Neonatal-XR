@@ -1,4 +1,5 @@
 import { fontFamily } from "@/constants/fontFamily";
+import { getStatusColors } from "@/utils/theme-helpers";
 import {
   Electricity,
   Flash,
@@ -13,31 +14,31 @@ import DetailsCard from "./details-card";
 const circuitryData = [
   {
     id: "1",
-    icon: <Lamp size={24} color="#0749FF" variant="Bold" />,
+    icon: <Lamp size={24} color="#222" variant="Bold" />,
     cardTitle: "Heater Switch State",
     cardData: "Online",
   },
   {
     id: "2",
-    icon: <Flash size={24} color="#0749FF" variant="Bold" />,
+    icon: <Flash size={24} color="#222" variant="Bold" />,
     cardTitle: "Heater Effort Level",
     cardData: "98%",
   },
   {
     id: "3",
-    icon: <SafeHome size={24} color="#0749FF" variant="Bold" />,
+    icon: <SafeHome size={24} color="#222" variant="Bold" />,
     cardTitle: "Voltage Leakage",
-    cardData: "Active",
+    cardData: "LEAKAGE",
   },
   {
     id: "4",
-    icon: <Electricity size={24} color="#0749FF" variant="Bold" />,
+    icon: <Electricity size={24} color="#222" variant="Bold" />,
     cardTitle: "Input Power Source",
-    cardData: "Active",
+    cardData: "MAIN",
   },
   {
     id: "5",
-    icon: <Setting size={24} color="#0749FF" variant="Bold" />,
+    icon: <Setting size={24} color="#222" variant="Bold" />,
     cardTitle: "Fuse Status",
     cardData: "Active",
   },
@@ -61,14 +62,19 @@ export default function Circuitry() {
         contentContainerStyle={styles.cardContainerContent}
         showsVerticalScrollIndicator={false}
       >
-        {circuitryData.map((item) => (
-          <DetailsCard
-            key={item.id}
-            icon={item.icon}
-            cardTitle={item.cardTitle}
-            cardData={item.cardData}
-          />
-        ))}
+        {circuitryData.map((item) => {
+          const colors = getStatusColors(item.cardData);
+          return (
+            <DetailsCard
+              key={item.id}
+              icon={item.icon}
+              cardTitle={item.cardTitle}
+              cardData={item.cardData}
+              dataBgColor={colors.bg}
+              dataTextColor={colors.text}
+            />
+          );
+        })}
       </ScrollView>
     </View>
   );

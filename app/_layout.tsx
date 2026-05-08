@@ -2,8 +2,8 @@ import { fontFamily } from "@/constants/fontFamily";
 import { DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { SplashScreen, Stack } from "expo-router";
-
 import { Platform, StatusBar } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 
 export const unstable_settings = {
@@ -14,11 +14,11 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded] = useFonts({
-    [fontFamily.black]: require("@/assets/fonts/GeistMono-Black.ttf"),
-    [fontFamily.bold]: require("@/assets/fonts/GeistMono-Bold.ttf"),
-    [fontFamily.semibold]: require("@/assets/fonts/GeistMono-SemiBold.ttf"),
-    [fontFamily.medium]: require("@/assets/fonts/GeistMono-Medium.ttf"),
-    [fontFamily.regular]: require("@/assets/fonts/GeistMono-Regular.ttf"),
+    [fontFamily.black]: require("@/assets/fonts/PaperMono-ExtraBold.otf"),
+    [fontFamily.bold]: require("@/assets/fonts/PaperMono-Bold.otf"),
+    [fontFamily.semibold]: require("@/assets/fonts/PaperMono-SemiBold.otf"),
+    [fontFamily.medium]: require("@/assets/fonts/PaperMono-Medium.otf"),
+    [fontFamily.regular]: require("@/assets/fonts/PaperMono-Regular.otf"),
     [fontFamily.light]: require("@/assets/fonts/GeistMono-Light.ttf"),
     [fontFamily.thin]: require("@/assets/fonts/GeistMono-Thin.ttf"),
   });
@@ -28,19 +28,23 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="modal"
-          options={{ presentation: "modal", title: "Modal" }}
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="modal"
+            options={{ presentation: "modal", title: "Modal" }}
+          />
+        </Stack>
+        <StatusBar
+          animated={true}
+          backgroundColor="#FFF"
+          barStyle={
+            Platform?.OS === "android" ? "light-content" : "dark-content"
+          }
         />
-      </Stack>
-      <StatusBar
-        animated={true}
-        backgroundColor="#222222"
-        barStyle={Platform?.OS === "android" ? "light-content" : "dark-content"}
-      />
-    </ThemeProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }

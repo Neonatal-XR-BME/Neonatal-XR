@@ -77,8 +77,7 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: 28,
-    fontFamily: fontFamily.semibold,
-    letterSpacing: -0.5,
+    fontFamily: fontFamily.bold,
   },
   text: {
     fontSize: 12,

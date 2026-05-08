@@ -6,19 +6,33 @@ export interface DetailsCardProps {
   icon: React.ReactNode;
   cardTitle: string;
   cardData: string | number;
+  dataBgColor?: string;
+  dataTextColor?: string;
 }
 
 export default function DetailsCard({
   icon,
   cardTitle,
   cardData,
+  dataBgColor,
+  dataTextColor,
 }: DetailsCardProps) {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
         {icon}
         <Text style={styles.cardTitle}>{cardTitle}</Text>
-        <Text style={styles.cardData}>{cardData}</Text>
+        <Text
+          style={[
+            styles.cardData,
+            {
+              backgroundColor: dataBgColor ? dataBgColor : "#DEE6FE",
+              color: dataTextColor ? dataTextColor : "#222",
+            },
+          ]}
+        >
+          {cardData}
+        </Text>
       </View>
     </View>
   );
@@ -46,7 +60,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 3,
     borderRadius: 4,
-    backgroundColor: "#F4F4F8",
     alignSelf: "flex-start",
   },
 });
