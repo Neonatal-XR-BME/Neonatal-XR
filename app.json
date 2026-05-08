@@ -12,10 +12,18 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.abdoorl.NeonatalXR",
       "infoPlist": {
-        "NSCameraUsageDescription": "This app uses the camera for AR features"
+        "NSCameraUsageDescription": "This app uses the camera for AR features",
+        "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos",
+        "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save photos",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use your microphone"
       }
     },
-    "plugins": ["@reactvision/react-viro"]
+    "plugins": [
+      "@reactvision/react-viro"
+    ],
+    "android": {
+      "package": "com.abdoorl.NeonatalXR"
+    }
   },
   "android": {
     "adaptiveIcon": {

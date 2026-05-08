@@ -38,8 +38,8 @@ function NeonatalARScene() {
       <ViroNode position={position}>
         {/* 3D Model */}
         <Viro3DObject
-          source={require("@/assets/models/damn.obj")}
-          resources={[require("@/assets/models/damn.mtl")]}
+          source={require("@/assets/models/neonatalXR.obj")}
+          resources={[require("@/assets/models/neonatalXR.mtl")]}
           type="OBJ"
           scale={scale}
           rotation={rotation}
