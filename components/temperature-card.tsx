@@ -24,7 +24,7 @@ export function TemperatureCard({
       <View style={styles.tempValue}>
         <Text style={styles.text}>
           Average value should be between{" "}
-          <Text style={styles.highlight}>36.1°C - 36.5°C</Text>. The current
+          <Text style={styles.highlight}>36.7°C - 36.5°C</Text>. The current
           core temperature is <Text style={styles.highlightTwo}>{state}</Text>
         </Text>
       </View>
