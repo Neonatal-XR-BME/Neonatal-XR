@@ -1,10 +1,11 @@
 import SwipeableScreen from "@/components/swipeablewrapper";
+import VRSceneWith3D from "@/components/vr-view";
 import {
   Viro3DObject,
   ViroAmbientLight,
   ViroARScene,
   ViroARSceneNavigator,
-  ViroImage,
+  ViroMaterials,
   ViroNode,
   ViroSpotLight,
 } from "@reactvision/react-viro";
@@ -17,32 +18,54 @@ function NeonatalARScene() {
   const [scale, setScale] = useState<[number, number, number]>([
     0.01, 0.01, 0.01,
   ]);
-  const [rotation, setRotation] = useState<[number, number, number]>([0, 0, 0]);
+  const [rotation, setRotation] = useState<[number, number, number]>([
+    -90, 0, 0,
+  ]);
   const [position, setPosition] = useState<[number, number, number]>([
     0, -0.5, -2,
   ]);
 
+  ViroMaterials.createMaterials({
+    steel: {
+      diffuseColor: "#8B5E3C",
+      lightingModel: "Blinn",
+      shininess: 0.3,
+    },
+    acrylic: {
+      diffuseColor: "#D2A679",
+      lightingModel: "Blinn",
+      shininess: 0.2,
+    },
+  });
+
   return (
     <ViroARScene>
-      {/* Lighting */}
-      <ViroAmbientLight color="#FFFFFF" intensity={200} />
+      <ViroAmbientLight color="#FFFFFF" intensity={300} />
       <ViroSpotLight
         innerAngle={5}
         outerAngle={45}
         direction={[0, -1, -0.2]}
-        position={[0, 3, 1]}
+        position={[0, 5, 1]}
         color="#ffffff"
         castsShadow={true}
+        intensity={500}
+      />
+      <ViroSpotLight
+        innerAngle={5}
+        outerAngle={45}
+        direction={[0, 0, -1]}
+        position={[0, 0, 5]}
+        color="#ffffff"
+        intensity={300}
       />
 
       <ViroNode position={position}>
-        {/* 3D Model */}
         <Viro3DObject
-          source={require("@/assets/models/neonatalXR.obj")}
-          resources={[require("@/assets/models/neonatalXR.mtl")]}
-          type="OBJ"
+          source={require("@/assets/models/neonatalXR.glb")}
+          type="GLB"
           scale={scale}
           rotation={rotation}
+          materials={["steel", "acrylic"]}
           onDrag={() => {}}
           onPinch={(pinchState, scaleFactor) => {
             if (pinchState === 3) {
@@ -56,21 +79,16 @@ function NeonatalARScene() {
           }}
           onRotate={(rotateState, rotationFactor) => {
             if (rotateState === 3) {
-              setRotation((prev) => [
-                prev[0],
-                prev[1] + rotationFactor,
-                prev[2],
-              ]);
+              setRotation(
+                (prev) =>
+                  [prev[0], prev[1] + rotationFactor, prev[2]] as [
+                    number,
+                    number,
+                    number
+                  ]
+              );
             }
           }}
-        />
-
-        {/* Logo floating above the model */}
-        <ViroImage
-          source={require("@/assets/models/logo.jpg")}
-          position={[0, 1.5, 0]}
-          height={0.3}
-          width={0.3}
         />
       </ViroNode>
     </ViroARScene>
@@ -80,40 +98,72 @@ function NeonatalARScene() {
 // Main AR View screen
 export default function ARView() {
   const [arEnabled, setArEnabled] = useState(false);
+  const [vrEnabled, setVrEnabled] = useState(false);
+
+  // Early returns keep the rendering tree clean and stop multiple things from rendering at once
+  if (arEnabled) {
+    return (
+      <View style={{ flex: 1 }}>
+        <ViroARSceneNavigator
+          initialScene={{ scene: NeonatalARScene }}
+          style={{ flex: 1 }}
+        />
+        <TouchableOpacity
+          style={styles.exitButton}
+          onPress={() => setArEnabled(false)}
+        >
+          <Text style={styles.exitText}>Exit AR</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (vrEnabled) {
+    return (
+      <View style={{ flex: 1 }}>
+        <ViroARSceneNavigator
+          initialScene={{ scene: VRSceneWith3D }}
+          style={{ flex: 1 }}
+        />
+
+        <TouchableOpacity
+          style={styles.exitButton}
+          onPress={() => setVrEnabled(false)}
+        >
+          <Text style={styles.exitText}>Exit VR</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaProvider>
-      {arEnabled ? (
-        <View style={{ flex: 1 }}>
-          <ViroARSceneNavigator
-            initialScene={{ scene: NeonatalARScene }}
-            style={{ flex: 1 }}
-          />
-          <TouchableOpacity
-            style={styles.exitButton}
-            onPress={() => setArEnabled(false)}
-          >
-            <Text style={styles.exitText}>Exit AR</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <SwipeableScreen>
-          <SafeAreaView style={styles.container}>
-            <View style={styles.content}>
-              <Text style={styles.title}>AR View</Text>
-              <Text style={styles.subtitle}>
-                View the neonatal incubator in augmented reality
-              </Text>
-              <TouchableOpacity
-                style={styles.arButton}
-                onPress={() => setArEnabled(true)}
-              >
-                <Text style={styles.arButtonText}>Launch AR</Text>
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
-        </SwipeableScreen>
-      )}
+      <SwipeableScreen>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.content}>
+            <Text style={styles.title}>AR View</Text>
+            <Text style={styles.subtitle}>
+              View the neonatal incubator in augmented reality
+            </Text>
+            <TouchableOpacity
+              style={styles.arButton}
+              onPress={() => setArEnabled(true)}
+            >
+              <Text style={styles.arButtonText}>Launch AR</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>VR View</Text>
+            <Text style={styles.subtitle}>
+              View the neonatal incubator in virtual reality
+            </Text>
+            <TouchableOpacity
+              style={styles.arButton}
+              onPress={() => setVrEnabled(true)}
+            >
+              <Text style={styles.arButtonText}>Launch VR</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </SwipeableScreen>
     </SafeAreaProvider>
   );
 }
