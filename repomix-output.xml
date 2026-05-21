@@ -81,6 +81,7 @@ assets/
     hospital_room.jpg
     hospital.hdr
     logo.jpg
+    neonatalXR.glb
     neonatalXR.mtl
     neonatalXR.obj
 components/
@@ -123,83 +124,6 @@ tsconfig.json
 
 <files>
 This section contains the contents of the repository's files.
-
-<file path="components/vr-view.tsx">
-import {
-  Viro360Image,
-  Viro3DObject,
-  ViroARScene,
-  ViroAmbientLight,
-  ViroMaterials,
-  ViroNode,
-  ViroSpotLight,
-} from "@reactvision/react-viro";
-
-ViroMaterials.createMaterials({
-  wood: {
-    diffuseColor: "#8B5E3C",
-    lightingModel: "Blinn",
-    shininess: 0.3,
-  },
-  acrylic: {
-    diffuseColor: "#D2A679",
-    lightingModel: "Blinn",
-
-    shininess: 0.2,
-  },
-});
-
-export default function VRSceneWith3D() {
-  return (
-    <ViroARScene>
-      {/* Your 360 image wraps around the user */}
-      <Viro360Image
-        source={require("@/assets/models/hospital_room.jpg")}
-        onLoadEnd={() => {}}
-        onError={(e) => {
-          console.error("Error loading 360 image:", e);
-        }}
-      />
-
-      {/* Lighting so the 3D model is visible */}
-      <ViroAmbientLight color="#FFFFFF" intensity={300} />
-      <ViroSpotLight
-        position={[0, 5, 0]}
-        direction={[0, -1, 0]}
-        color="#ffffff"
-        intensity={500}
-        castsShadow={true}
-      />
-
-      {/* Your 3D incubator inside the 360 scene */}
-      <ViroNode position={[0, -1, -3]}>
-        <Viro3DObject
-          source={require("@/assets/models/neonatalXR.obj")}
-          resources={[require("@/assets/models/neonatalXR.mtl")]}
-          type="OBJ"
-          scale={[0.01, 0.01, 0.01]}
-          rotation={[-90, 0, 0]}
-          materials={["wood", "acrylic"]}
-        />
-      </ViroNode>
-    </ViroARScene>
-  );
-}
-
-// import { Viro360Image, ViroARScene } from "@reactvision/react-viro";
-
-// export default function VRSceneWith3D() {
-//   return (
-//     <ViroARScene>
-//       <Viro360Image
-//         source={require("@/assets/models/hospital_room.jpg")}
-//         onLoadEnd={() => console.log("360 image loaded")}
-//         onError={(e) => console.error("Error loading 360 image:", e)}
-//       />
-//     </ViroARScene>
-//   );
-// }
-</file>
 
 <file path="app/modal.tsx">
 import { Link } from 'expo-router';
@@ -642,6 +566,96 @@ const styles = StyleSheet.create({
 });
 </file>
 
+<file path="components/vr-view.tsx">
+import {
+  Viro360Image,
+  Viro3DObject,
+  ViroARScene,
+  ViroAmbientLight,
+  ViroMaterials,
+  ViroNode,
+  ViroSpotLight,
+} from "@reactvision/react-viro";
+import { useState } from "react";
+
+ViroMaterials.createMaterials({
+  wood: {
+    diffuseColor: "#8B5E3C",
+    lightingModel: "Blinn",
+    shininess: 0.3,
+  },
+  acrylic: {
+    diffuseColor: "#D2A679",
+    lightingModel: "Blinn",
+    shininess: 0.2,
+  },
+});
+
+export default function VRSceneWith3D() {
+  const [scale, setScale] = useState<[number, number, number]>([
+    0.01, 0.01, 0.01,
+  ]);
+  const [rotation, setRotation] = useState<[number, number, number]>([
+    -90, 0, 0,
+  ]);
+  const [position, setPosition] = useState<[number, number, number]>([
+    0, -1, -3,
+  ]);
+
+  return (
+    <ViroARScene>
+      <Viro360Image
+        source={require("@/assets/models/hospital_room.jpg")}
+        isHdr={false}
+      />
+
+      <ViroAmbientLight color="#FFFFFF" intensity={300} />
+      <ViroSpotLight
+        position={[0, 5, 0]}
+        direction={[0, -1, 0]}
+        color="#ffffff"
+        intensity={500}
+        castsShadow={true}
+      />
+
+      <ViroNode position={position}>
+        <Viro3DObject
+          source={require("@/assets/models/neonatalXR.glb")}
+          type="GLB"
+          scale={scale}
+          rotation={rotation}
+          onDrag={(dragToPos) => {
+            setPosition(dragToPos as [number, number, number]);
+          }}
+          onPinch={(pinchState, scaleFactor) => {
+            if (pinchState === 3) {
+              setScale(
+                (prev) =>
+                  prev.map((s) =>
+                    Math.min(Math.max(s * scaleFactor, 0.005), 0.05)
+                  ) as [number, number, number]
+              );
+            }
+          }}
+          onRotate={(rotateState, rotationFactor) => {
+            if (rotateState === 3) {
+              setRotation(
+                (prev) =>
+                  [prev[0], prev[1] + rotationFactor, prev[2]] as [
+                    number,
+                    number,
+                    number
+                  ]
+              );
+            }
+          }}
+        />
+      </ViroNode>
+    </ViroARScene>
+  );
+}
+</file>
+
 <file path="constants/fontFamily.ts">
 export const fontFamily = {
   black: "GeistMonoBlack",
@@ -967,16 +981,6 @@ module.exports = defineConfig([
     ignores: ['dist/*'],
   },
 ]);
-</file>
-
-<file path="metro.config.js">
-const { getDefaultConfig } = require("expo/metro-config");
-
-const config = getDefaultConfig(__dirname);
-
-config.resolver.assetExts.push("obj", "mtl", "png");
-
-module.exports = config;
 </file>
 
 <file path="README.md">
@@ -1496,6 +1500,16 @@ const styles = StyleSheet.create({
 });
 </file>
 
+<file path="metro.config.js">
+const { getDefaultConfig } = require("expo/metro-config");
+
+const config = getDefaultConfig(__dirname);
+
+config.resolver.assetExts.push("obj", "mtl", "glb", "gltf");
+
+module.exports = config;
+</file>
+
 <file path="tsconfig.json">
 {
   "extends": "expo/tsconfig.base",
@@ -1876,229 +1890,6 @@ const styles = StyleSheet.create({
 });
 </file>
 
-<file path="app/(tabs)/arview.tsx">
-import SwipeableScreen from "@/components/swipeablewrapper";
-import VRSceneWith3D from "@/components/vr-view";
-import {
-  Viro3DObject,
-  ViroAmbientLight,
-  ViroARScene,
-  ViroARSceneNavigator,
-  ViroMaterials,
-  ViroNode,
-  ViroSpotLight,
-} from "@reactvision/react-viro";
-import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-
-// The AR Scene component
-function NeonatalARScene() {
-  const [scale, setScale] = useState<[number, number, number]>([
-    0.01, 0.01, 0.01,
-  ]);
-  const [rotation, setRotation] = useState<[number, number, number]>([
-    -90, 0, 0,
-  ]);
-  const [position, setPosition] = useState<[number, number, number]>([
-    0, -0.5, -2,
-  ]);
-
-  ViroMaterials.createMaterials({
-    steel: {
-      diffuseColor: "#8B5E3C",
-      lightingModel: "Blinn",
-      shininess: 0.3,
-    },
-    acrylic: {
-      diffuseColor: "#D2A679",
-      lightingModel: "Blinn",
-      shininess: 0.2,
-    },
-  });
-
-  return (
-    <ViroARScene>
-      <ViroAmbientLight color="#FFFFFF" intensity={300} />
-      <ViroSpotLight
-        innerAngle={5}
-        outerAngle={45}
-        direction={[0, -1, -0.2]}
-        position={[0, 5, 1]}
-        color="#ffffff"
-        castsShadow={true}
-        intensity={500}
-      />
-      <ViroSpotLight
-        innerAngle={5}
-        outerAngle={45}
-        direction={[0, 0, -1]}
-        position={[0, 0, 5]}
-        color="#ffffff"
-        intensity={300}
-      />
-
-      <ViroNode position={position}>
-        <Viro3DObject
-          source={require("@/assets/models/neonatalXR.obj")}
-          resources={[require("@/assets/models/neonatalXR.mtl")]}
-          type="OBJ"
-          scale={scale}
-          rotation={rotation}
-          materials={["steel", "acrylic"]}
-          onDrag={() => {}}
-          onPinch={(pinchState, scaleFactor) => {
-            if (pinchState === 3) {
-              setScale(
-                (prev) =>
-                  prev.map((s) =>
-                    Math.min(Math.max(s * scaleFactor, 0.005), 0.05)
-                  ) as [number, number, number]
-              );
-            }
-          }}
-          onRotate={(rotateState, rotationFactor) => {
-            if (rotateState === 3) {
-              setRotation(
-                (prev) =>
-                  [prev[0], prev[1] + rotationFactor, prev[2]] as [
-                    number,
-                    number,
-                    number
-                  ]
-              );
-            }
-          }}
-        />
-      </ViroNode>
-    </ViroARScene>
-  );
-}
-
-// Main AR View screen
-export default function ARView() {
-  const [arEnabled, setArEnabled] = useState(false);
-  const [vrEnabled, setVrEnabled] = useState(false);
-
-  // Early returns keep the rendering tree clean and stop multiple things from rendering at once
-  if (arEnabled) {
-    return (
-      <View style={{ flex: 1 }}>
-        <ViroARSceneNavigator
-          initialScene={{ scene: NeonatalARScene }}
-          style={{ flex: 1 }}
-        />
-        <TouchableOpacity
-          style={styles.exitButton}
-          onPress={() => setArEnabled(false)}
-        >
-          <Text style={styles.exitText}>Exit AR</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (vrEnabled) {
-    return (
-      <View style={{ flex: 1 }}>
-        <ViroARSceneNavigator
-          initialScene={{ scene: VRSceneWith3D }}
-          style={{ flex: 1 }}
-        />
-
-        <TouchableOpacity
-          style={styles.exitButton}
-          onPress={() => setVrEnabled(false)}
-        >
-          <Text style={styles.exitText}>Exit VR</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  return (
-    <SafeAreaProvider>
-      <SwipeableScreen>
-        <SafeAreaView style={styles.container}>
-          <View style={styles.content}>
-            <Text style={styles.title}>AR View</Text>
-            <Text style={styles.subtitle}>
-              View the neonatal incubator in augmented reality
-            </Text>
-            <TouchableOpacity
-              style={styles.arButton}
-              onPress={() => setArEnabled(true)}
-            >
-              <Text style={styles.arButtonText}>Launch AR</Text>
-            </TouchableOpacity>
-            <Text style={styles.title}>VR View</Text>
-            <Text style={styles.subtitle}>
-              View the neonatal incubator in virtual reality
-            </Text>
-            <TouchableOpacity
-              style={styles.arButton}
-              onPress={() => setVrEnabled(true)}
-            >
-              <Text style={styles.arButtonText}>Launch VR</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </SwipeableScreen>
-    </SafeAreaProvider>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F4F4F8",
-    padding: 16,
-  },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#222",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-  },
-  arButton: {
-    backgroundColor: "#0749FF",
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    marginTop: 20,
-  },
-  arButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  exitButton: {
-    position: "absolute",
-    top: 60,
-    left: 20,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-  },
-  exitText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-});
-</file>
-
 <file path="app/(tabs)/index.tsx">
 import HumidityCard from "@/components/humidity-card";
 import { SetPointCard } from "@/components/setpoint-temperature";
@@ -2416,6 +2207,285 @@ export default function RootLayout() {
   },
   "private": true
 }
+</file>
+
+<file path="app/(tabs)/arview.tsx">
+import SwipeableScreen from "@/components/swipeablewrapper";
+import VRSceneWith3D from "@/components/vr-view";
+import {
+  Viro3DObject,
+  ViroAmbientLight,
+  ViroARImageMarker,
+  ViroARScene,
+  ViroARSceneNavigator,
+  ViroARTrackingTargets,
+  ViroMaterials,
+  ViroNode,
+  ViroSpotLight,
+  ViroText,
+} from "@reactvision/react-viro";
+import React, { useRef, useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+
+// Register tracking target
+ViroARTrackingTargets.createTargets({
+  logo: {
+    source: require("@/assets/models/logo.jpg"),
+    orientation: "Up",
+    physicalWidth: 0.1,
+  },
+});
+
+ViroMaterials.createMaterials({
+  steel: {
+    diffuseColor: "#8B5E3C",
+    lightingModel: "Blinn",
+    shininess: 0.3,
+  },
+  acrylic: {
+    diffuseColor: "#D2A679",
+    lightingModel: "Blinn",
+    shininess: 0.2,
+  },
+});
+
+// Default values for reset
+const DEFAULT_SCALE: [number, number, number] = [0.2, 0.2, 0.2];
+const DEFAULT_ROTATION: [number, number, number] = [0, 0, 0];
+const DEFAULT_POSITION: [number, number, number] = [0, 0.05, 0];
+
+function NeonatalARScene() {
+  const [scale, setScale] = useState<[number, number, number]>([
+    ...DEFAULT_SCALE,
+  ]);
+  const [rotation, setRotation] = useState<[number, number, number]>([
+    ...DEFAULT_ROTATION,
+  ]);
+  const [position, setPosition] = useState<[number, number, number]>([
+    ...DEFAULT_POSITION,
+  ]);
+  const [modelVisible, setModelVisible] = useState(false);
+
+  // Track last known values for smooth continuous gestures
+  const lastScaleRef = useRef<number>(1);
+  const lastRotationRef = useRef<number>(0);
+
+  const handlePinch = (
+    pinchState: number,
+    scaleFactor: number,
+    source: any
+  ) => {
+    if (pinchState === 2) {
+      const delta = scaleFactor / lastScaleRef.current;
+      lastScaleRef.current = scaleFactor;
+      setScale(
+        (prev) =>
+          prev.map((s) => Math.max(s * delta, 0.001)) as [
+            number,
+            number,
+            number
+          ]
+      );
+    } else if (pinchState === 3) {
+      lastScaleRef.current = 1;
+    }
+  };
+
+  const handleRotate = (
+    rotateState: number,
+    rotationFactor: number,
+    source: any
+  ) => {
+    if (rotateState === 2) {
+      // Ongoing — apply incremental rotation
+      const delta = rotationFactor - lastRotationRef.current;
+      lastRotationRef.current = rotationFactor;
+      setRotation(
+        (prev) =>
+          [prev[0], prev[1] + delta, prev[2]] as [number, number, number]
+      );
+    } else if (rotateState === 3) {
+      // End — reset ref
+      lastRotationRef.current = 0;
+    }
+  };
+
+  const handleDrag = (dragToPos: number[], source: any) => {
+    // Position updates automatically with FixedToWorld
+  };
+
+  const resetModel = () => {
+    setScale([...DEFAULT_SCALE]);
+    setRotation([...DEFAULT_ROTATION]);
+    setPosition([...DEFAULT_POSITION]);
+  };
+
+  return (
+    <ViroARScene>
+      <ViroAmbientLight color="#FFFFFF" intensity={400} />
+      <ViroSpotLight
+        innerAngle={5}
+        outerAngle={45}
+        direction={[0, -1, -0.2]}
+        position={[0, 5, 1]}
+        color="#ffffff"
+        castsShadow={true}
+        shadowMapSize={2048}
+        shadowNearZ={2}
+        shadowFarZ={5}
+        shadowOpacity={0.7}
+        intensity={500}
+      />
+
+      <ViroARImageMarker
+        target="logo"
+        onAnchorFound={() => setModelVisible(true)}
+        onAnchorRemoved={() => setModelVisible(false)}
+      >
+        {modelVisible && (
+          <ViroNode position={position}>
+            <Viro3DObject
+              source={require("@/assets/models/neonatalXR.glb")}
+              type="GLB"
+              scale={scale}
+              rotation={rotation}
+              dragType="FixedToWorld"
+              onDrag={handleDrag}
+              onPinch={handlePinch}
+              onRotate={handleRotate}
+            />
+
+            {/* Reset label — tap to reset */}
+            <ViroText
+              text="↺ Reset"
+              position={[0, 0.25, 0]}
+              scale={[0.15, 0.15, 0.15]}
+              style={{ fontSize: 12, color: "#FFFFFF", fontWeight: "bold" }}
+              outerStroke={{ type: "Outline", width: 2, color: "#000000" }}
+              onClick={resetModel}
+            />
+          </ViroNode>
+        )}
+      </ViroARImageMarker>
+    </ViroARScene>
+  );
+}
+
+export default function ARView() {
+  const [arEnabled, setArEnabled] = useState(false);
+  const [vrEnabled, setVrEnabled] = useState(false);
+
+  if (arEnabled) {
+    return (
+      <View style={{ flex: 1 }}>
+        <ViroARSceneNavigator
+          initialScene={{ scene: NeonatalARScene }}
+          style={{ flex: 1 }}
+        />
+        <View style={styles.overlayControls}>
+          <TouchableOpacity
+            style={styles.exitButton}
+            onPress={() => setArEnabled(false)}
+          >
+            <Text style={styles.exitText}>Exit AR</Text>
+          </TouchableOpacity>
+          <Text style={styles.hint}>
+            Point camera at logo • Pinch to resize • Two-finger rotate • Drag to
+            move
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (vrEnabled) {
+    return (
+      <View style={{ flex: 1 }}>
+        <ViroARSceneNavigator
+          initialScene={{ scene: VRSceneWith3D }}
+          style={{ flex: 1 }}
+        />
+        <TouchableOpacity
+          style={styles.exitButton}
+          onPress={() => setVrEnabled(false)}
+        >
+          <Text style={styles.exitText}>Exit VR</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaProvider>
+      <SwipeableScreen>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.content}>
+            <Text style={styles.title}>AR View</Text>
+            <Text style={styles.subtitle}>
+              Point your camera at the logo to see the 3D incubator
+            </Text>
+            <TouchableOpacity
+              style={styles.arButton}
+              onPress={() => setArEnabled(true)}
+            >
+              <Text style={styles.arButtonText}>Launch AR</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>VR View</Text>
+            <Text style={styles.subtitle}>
+              View the neonatal incubator in virtual reality
+            </Text>
+            <TouchableOpacity
+              style={styles.arButton}
+              onPress={() => setVrEnabled(true)}
+            >
+              <Text style={styles.arButtonText}>Launch VR</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </SwipeableScreen>
+    </SafeAreaProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#F4F4F8", padding: 16 },
+  content: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
+  title: { fontSize: 24, fontWeight: "bold", color: "#222" },
+  subtitle: { fontSize: 14, color: "#666", textAlign: "center" },
+  arButton: {
+    backgroundColor: "#0749FF",
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    marginTop: 20,
+  },
+  arButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  overlayControls: {
+    position: "absolute",
+    top: 50,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    gap: 10,
+  },
+  exitButton: {
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+  },
+  exitText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  hint: {
+    color: "#fff",
+    fontSize: 12,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    textAlign: "center",
+  },
+});
 </file>
 
 <file path="components/temperature-card.tsx">

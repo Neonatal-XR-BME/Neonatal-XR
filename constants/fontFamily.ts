@@ -6,4 +6,5 @@ export const fontFamily = {
   regular: "GeistMonoRegular",
   light: "GeistMonoLight",
   thin: "GeistMonoThin",
+  Paprika: "PaprikaRegular",
 };

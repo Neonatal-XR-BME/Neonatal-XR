@@ -21,6 +21,7 @@ export default function RootLayout() {
     [fontFamily.regular]: require("@/assets/fonts/PaperMono-Regular.otf"),
     [fontFamily.light]: require("@/assets/fonts/GeistMono-Light.ttf"),
     [fontFamily.thin]: require("@/assets/fonts/GeistMono-Thin.ttf"),
+    [fontFamily.Paprika]: require("@/assets/fonts/Paprika-Regular.ttf"),
   });
 
   if (loaded) {
@@ -35,6 +36,22 @@ export default function RootLayout() {
           <Stack.Screen
             name="modal"
             options={{ presentation: "modal", title: "Modal" }}
+          />
+          <Stack.Screen
+            name="arscene"
+            options={{
+              animation: "slide_from_right",
+              gestureEnabled: false,
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="vrscene"
+            options={{
+              animation: "slide_from_right",
+              gestureEnabled: false,
+              headerShown: false,
+            }}
           />
         </Stack>
         <StatusBar

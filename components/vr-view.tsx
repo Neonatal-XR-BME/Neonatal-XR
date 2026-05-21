@@ -6,6 +6,7 @@ import {
   ViroMaterials,
   ViroNode,
   ViroSpotLight,
+  ViroText,
 } from "@reactvision/react-viro";
 import { useState } from "react";
 
@@ -23,63 +24,62 @@ ViroMaterials.createMaterials({
 });
 
 export default function VRSceneWith3D() {
-  const [scale, setScale] = useState<[number, number, number]>([
-    0.01, 0.01, 0.01,
-  ]);
-  const [rotation, setRotation] = useState<[number, number, number]>([
-    -90, 0, 0,
-  ]);
-  const [position, setPosition] = useState<[number, number, number]>([
-    0, -1, -3,
-  ]);
+  const [distance, setDistance] = useState<number>(0);
+  const modelPosition: [number, number, number] = [0, -0.5, -2];
+
+  const handleCameraTransform = (cameraTransform: any) => {
+    const camPos = cameraTransform.cameraTransform.position;
+    const dx = camPos[0] - modelPosition[0];
+    const dy = camPos[1] - modelPosition[1];
+    const dz = camPos[2] - modelPosition[2];
+    setDistance(Math.sqrt(dx * dx + dy * dy + dz * dz));
+  };
 
   return (
-    <ViroARScene>
-      <Viro360Image
-        source={require("@/assets/models/hospital_room.jpg")}
-        isHdr={false}
-      />
+    <ViroARScene onCameraTransformUpdate={handleCameraTransform}>
+      {/* 360 background — rendered first */}
+      <Viro360Image source={require("@/assets/models/hospital_room.jpg")} />
 
-      <ViroAmbientLight color="#FFFFFF" intensity={300} />
+      {/* Lighting — increase intensity so model is visible against 360 */}
+      <ViroAmbientLight color="#FFFFFF" intensity={500} />
       <ViroSpotLight
         position={[0, 5, 0]}
         direction={[0, -1, 0]}
         color="#ffffff"
-        intensity={500}
+        intensity={800}
         castsShadow={true}
       />
+      <ViroSpotLight
+        position={[0, 0, 5]}
+        direction={[0, 0, -1]}
+        color="#ffffff"
+        intensity={400}
+      />
 
-      <ViroNode position={position}>
+      {/* 3D model — larger scale, closer position */}
+      <ViroNode position={modelPosition}>
         <Viro3DObject
           source={require("@/assets/models/neonatalXR.glb")}
           type="GLB"
-          scale={scale}
-          rotation={rotation}
-          onDrag={(dragToPos) => {
-            setPosition(dragToPos as [number, number, number]);
+          scale={[1.6, 1.6, 1.6]}
+          position={[0, -0.9, 0]}
+          rotation={[0, 0, 0]}
+          onLoadStart={() => console.log("VR model loading...")}
+          onLoadEnd={() => console.log("VR model loaded!")}
+          onError={(event: any) => console.error("VR model error:", event)}
+        />
+
+        <ViroText
+          text={`${distance.toFixed(1)}m away`}
+          position={[0, 0.5, 0]}
+          scale={[0.2, 0.2, 0.2]}
+          style={{
+            fontSize: 14,
+            color: "#FFFFFF",
+            fontWeight: "bold",
+            textAlign: "center",
           }}
-          onPinch={(pinchState, scaleFactor) => {
-            if (pinchState === 3) {
-              setScale(
-                (prev) =>
-                  prev.map((s) =>
-                    Math.min(Math.max(s * scaleFactor, 0.005), 0.05)
-                  ) as [number, number, number]
-              );
-            }
-          }}
-          onRotate={(rotateState, rotationFactor) => {
-            if (rotateState === 3) {
-              setRotation(
-                (prev) =>
-                  [prev[0], prev[1] + rotationFactor, prev[2]] as [
-                    number,
-                    number,
-                    number
-                  ]
-              );
-            }
-          }}
+          outerStroke={{ type: "Outline", width: 2, color: "#000000" }}
         />
       </ViroNode>
     </ViroARScene>

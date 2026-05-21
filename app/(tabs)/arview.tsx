@@ -1,219 +1,345 @@
-import SwipeableScreen from "@/components/swipeablewrapper";
-import VRSceneWith3D from "@/components/vr-view";
+import ARSVG from "@/assets/images/AR.svg";
+import VRSVG from "@/assets/images/VR.svg";
+import { router } from "expo-router";
+import React, { useRef, useState } from "react";
+
+import { fontFamily } from "@/constants/fontFamily";
+import { LinearGradient } from "expo-linear-gradient";
 import {
-  Viro3DObject,
-  ViroAmbientLight,
-  ViroARScene,
-  ViroARSceneNavigator,
-  ViroMaterials,
-  ViroNode,
-  ViroSpotLight,
-} from "@reactvision/react-viro";
-import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+  Animated,
+  Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
-// The AR Scene component
-function NeonatalARScene() {
-  const [scale, setScale] = useState<[number, number, number]>([
-    0.01, 0.01, 0.01,
-  ]);
-  const [rotation, setRotation] = useState<[number, number, number]>([
-    -90, 0, 0,
-  ]);
-  const [position, setPosition] = useState<[number, number, number]>([
-    0, -0.5, -2,
-  ]);
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
-  ViroMaterials.createMaterials({
-    steel: {
-      diffuseColor: "#8B5E3C",
-      lightingModel: "Blinn",
-      shininess: 0.3,
-    },
-    acrylic: {
-      diffuseColor: "#D2A679",
-      lightingModel: "Blinn",
-      shininess: 0.2,
-    },
-  });
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const CARD_WIDTH = SCREEN_WIDTH * 0.9;
+const CARD_SPACING = 12;
+const SNAP_INTERVAL = CARD_WIDTH + CARD_SPACING;
 
-  return (
-    <ViroARScene>
-      <ViroAmbientLight color="#FFFFFF" intensity={300} />
-      <ViroSpotLight
-        innerAngle={5}
-        outerAngle={45}
-        direction={[0, -1, -0.2]}
-        position={[0, 5, 1]}
-        color="#ffffff"
-        castsShadow={true}
-        intensity={500}
-      />
-      <ViroSpotLight
-        innerAngle={5}
-        outerAngle={45}
-        direction={[0, 0, -1]}
-        position={[0, 0, 5]}
-        color="#ffffff"
-        intensity={300}
-      />
+const cards = [
+  {
+    id: "ar",
+    title: "Augmented\nReality (AR)\nView",
+    description:
+      "Check your camera permission first. Then you point your camera at the physical neonatal warmer to see its 3D Version",
+    route: "/arscene",
+    buttonText: "LAUNCH AR",
+    colors: ["#0749FF", "#1709B0"] as const,
+    dotColor: "#0749FF",
+    icon: "scan-outline" as const,
+  },
+  {
+    id: "vr",
+    title: "Virtual\nReality (VR)\nView",
+    description:
+      "Check your camera permission first. Then you can try to interact with the 3D model in your virtual environment.",
+    route: "/vrscene",
+    buttonText: "LAUNCH VR",
+    colors: ["#00A651", "#005C2E"] as const,
+    dotColor: "#00A651",
+    icon: "glasses-outline" as const,
+  },
+];
 
-      <ViroNode position={position}>
-        <Viro3DObject
-          source={require("@/assets/models/neonatalXR.glb")}
-          type="GLB"
-          scale={scale}
-          rotation={rotation}
-          materials={["steel", "acrylic"]}
-          onDrag={() => {}}
-          onPinch={(pinchState, scaleFactor) => {
-            if (pinchState === 3) {
-              setScale(
-                (prev) =>
-                  prev.map((s) =>
-                    Math.min(Math.max(s * scaleFactor, 0.005), 0.05)
-                  ) as [number, number, number]
-              );
-            }
-          }}
-          onRotate={(rotateState, rotationFactor) => {
-            if (rotateState === 3) {
-              setRotation(
-                (prev) =>
-                  [prev[0], prev[1] + rotationFactor, prev[2]] as [
-                    number,
-                    number,
-                    number
-                  ]
-              );
-            }
-          }}
-        />
-      </ViroNode>
-    </ViroARScene>
+export default function ARViewTab() {
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+    { useNativeDriver: false }
   );
-}
 
-// Main AR View screen
-export default function ARView() {
-  const [arEnabled, setArEnabled] = useState(false);
-  const [vrEnabled, setVrEnabled] = useState(false);
-
-  // Early returns keep the rendering tree clean and stop multiple things from rendering at once
-  if (arEnabled) {
-    return (
-      <View style={{ flex: 1 }}>
-        <ViroARSceneNavigator
-          initialScene={{ scene: NeonatalARScene }}
-          style={{ flex: 1 }}
-        />
-        <TouchableOpacity
-          style={styles.exitButton}
-          onPress={() => setArEnabled(false)}
-        >
-          <Text style={styles.exitText}>Exit AR</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (vrEnabled) {
-    return (
-      <View style={{ flex: 1 }}>
-        <ViroARSceneNavigator
-          initialScene={{ scene: VRSceneWith3D }}
-          style={{ flex: 1 }}
-        />
-
-        <TouchableOpacity
-          style={styles.exitButton}
-          onPress={() => setVrEnabled(false)}
-        >
-          <Text style={styles.exitText}>Exit VR</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const handleMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = Math.round(e.nativeEvent.contentOffset.x / SNAP_INTERVAL);
+    setActiveIndex(index);
+  };
 
   return (
     <SafeAreaProvider>
-      <SwipeableScreen>
-        <SafeAreaView style={styles.container}>
-          <View style={styles.content}>
-            <Text style={styles.title}>AR View</Text>
-            <Text style={styles.subtitle}>
-              View the neonatal incubator in augmented reality
-            </Text>
-            <TouchableOpacity
-              style={styles.arButton}
-              onPress={() => setArEnabled(true)}
-            >
-              <Text style={styles.arButtonText}>Launch AR</Text>
-            </TouchableOpacity>
-            <Text style={styles.title}>VR View</Text>
-            <Text style={styles.subtitle}>
-              View the neonatal incubator in virtual reality
-            </Text>
-            <TouchableOpacity
-              style={styles.arButton}
-              onPress={() => setVrEnabled(true)}
-            >
-              <Text style={styles.arButtonText}>Launch VR</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </SwipeableScreen>
+      <SafeAreaView style={styles.container}>
+        <Animated.ScrollView
+          horizontal
+          pagingEnabled={false}
+          snapToInterval={SNAP_INTERVAL}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          onScroll={handleScroll}
+          onMomentumScrollEnd={handleMomentumEnd}
+          scrollEventThrottle={16}
+        >
+          {cards.map((card, index) => {
+            const inputRange = [
+              (index - 1) * SNAP_INTERVAL,
+              index * SNAP_INTERVAL,
+              (index + 1) * SNAP_INTERVAL,
+            ];
+
+            const cardScale = scrollX.interpolate({
+              inputRange,
+              outputRange: [0.92, 1, 0.92],
+              extrapolate: "clamp",
+            });
+
+            const cardOpacity = scrollX.interpolate({
+              inputRange,
+              outputRange: [0.6, 1, 0.6],
+              extrapolate: "clamp",
+            });
+
+            return (
+              <Animated.View
+                key={card.id}
+                style={[
+                  styles.cardShadow,
+                  {
+                    transform: [{ scale: cardScale }],
+                    opacity: cardOpacity,
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={[...card.colors]}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={styles.card}
+                >
+                  {/* Top content */}
+                  <View style={styles.cardTop}>
+                    <Text style={styles.cardTitle}>{card.title}</Text>
+                    <Text style={styles.cardDescription}>
+                      {card.description}
+                    </Text>
+                  </View>
+
+                  {/* Center icon area */}
+                  <View style={styles.cardCenter}>
+                    <View style={styles.iconContainer}>
+                      {card.id === "ar" ? (
+                        // AR viewfinder icon
+                        <View style={styles.arIconBox}>
+                          {/* Corner brackets */}
+                          <ARSVG />
+                        </View>
+                      ) : (
+                        // VR headset icon
+                        <View>
+                          <VRSVG />
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Launch button */}
+                  <TouchableOpacity
+                    style={styles.launchButton}
+                    onPress={() => router.push(card.route as any)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.launchButtonText}>
+                      {card.buttonText}
+                    </Text>
+                  </TouchableOpacity>
+                </LinearGradient>
+              </Animated.View>
+            );
+          })}
+        </Animated.ScrollView>
+
+        {/* Page indicator dots */}
+        <View style={styles.pagination}>
+          {cards.map((_, index) => {
+            const dotWidth = scrollX.interpolate({
+              inputRange: [
+                (index - 1) * SNAP_INTERVAL,
+                index * SNAP_INTERVAL,
+                (index + 1) * SNAP_INTERVAL,
+              ],
+              outputRange: [8, 24, 8],
+              extrapolate: "clamp",
+            });
+
+            const dotColor = scrollX.interpolate({
+              inputRange: [
+                (index - 1) * SNAP_INTERVAL,
+                index * SNAP_INTERVAL,
+                (index + 1) * SNAP_INTERVAL,
+              ],
+              outputRange: ["#CCCCCC", cards[index].dotColor, "#CCCCCC"],
+              extrapolate: "clamp",
+            });
+
+            return (
+              <Animated.View
+                key={index}
+                style={[
+                  styles.dot,
+                  {
+                    width: dotWidth,
+                    backgroundColor: dotColor,
+                  },
+                ]}
+              />
+            );
+          })}
+        </View>
+      </SafeAreaView>
     </SafeAreaProvider>
   );
 }
+
+const CORNER_SIZE = 30;
+const CORNER_BORDER = 3;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F4F4F8",
-    padding: 16,
+    position: "relative",
   },
-  content: {
+  scrollContent: {
+    paddingHorizontal: (SCREEN_WIDTH - CARD_WIDTH) / 2,
+    paddingTop: 12,
+    gap: CARD_SPACING,
+    marginBottom: 38,
+  },
+  cardShadow: {
+    width: CARD_WIDTH,
+    flex: 1,
+    borderRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  card: {
+    flex: 1,
+    borderRadius: 40,
+    padding: 28,
+    justifyContent: "space-between",
+    overflow: "hidden",
+  },
+  cardTop: {
+    gap: 12,
+  },
+  cardTitle: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    fontFamily: fontFamily.Paprika,
+  },
+  cardDescription: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.75)",
+    lineHeight: 18,
+    fontFamily: fontFamily.medium,
+  },
+  cardCenter: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    gap: 12,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#222",
+  iconContainer: {
+    width: 180,
+    height: 180,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  subtitle: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
+
+  // AR viewfinder
+  arIconBox: {
+    width: 160,
+    height: 160,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
   },
-  arButton: {
-    backgroundColor: "#0749FF",
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    marginTop: 20,
-  },
-  arButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  exitButton: {
+  corner: {
     position: "absolute",
-    top: 60,
-    left: 20,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
+    width: CORNER_SIZE,
+    height: CORNER_SIZE,
+    borderColor: "rgba(255,255,255,0.8)",
   },
-  exitText: {
-    color: "#fff",
+  topLeft: {
+    top: 0,
+    left: 0,
+    borderTopWidth: CORNER_BORDER,
+    borderLeftWidth: CORNER_BORDER,
+    borderTopLeftRadius: 4,
+  },
+  topRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: CORNER_BORDER,
+    borderRightWidth: CORNER_BORDER,
+    borderTopRightRadius: 4,
+  },
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: CORNER_BORDER,
+    borderLeftWidth: CORNER_BORDER,
+    borderBottomLeftRadius: 4,
+  },
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: CORNER_BORDER,
+    borderRightWidth: CORNER_BORDER,
+    borderBottomRightRadius: 4,
+  },
+
+  // VR icon
+  vrIconBox: {
+    width: 160,
+    height: 160,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // Launch button
+  launchButton: {
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  launchButtonText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
+    fontFamily: fontFamily.bold,
+    color: "#222",
+    letterSpacing: 1,
+  },
+  arIcon: {
+    width: 280,
+    height: 280,
+  },
+
+  // Pagination
+  pagination: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    paddingBottom: 16,
+    alignSelf: "center",
+    position: "absolute",
+    bottom: 0,
+  },
+  dot: {
+    height: 8,
+    borderRadius: 4,
   },
 });
