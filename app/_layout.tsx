@@ -1,7 +1,9 @@
 import { fontFamily } from "@/constants/fontFamily";
 import { DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { SplashScreen, Stack } from "expo-router";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
 import { Platform, StatusBar } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
@@ -24,10 +26,15 @@ export default function RootLayout() {
     [fontFamily.Paprika]: require("@/assets/fonts/Paprika-Regular.ttf"),
   });
 
-  if (loaded) {
-    SplashScreen.hideAsync();
-  }
+  useEffect(() => {
+    if (loaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded]);
 
+  if (!loaded) {
+    return null; // Don't render anything until fonts are ready
+  }
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={DefaultTheme}>
