@@ -1,5 +1,6 @@
-import VRNavigator from "@/components/vr-view";
+import VRSceneWith3D from "@/components/vr-view";
 import { fontFamily } from "@/constants/fontFamily";
+import { ViroARSceneNavigator } from "@reactvision/react-viro";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { router } from "expo-router";
 import { ArrowLeft2 } from "iconsax-react-nativejs";
@@ -17,9 +18,8 @@ function GlassBackButton() {
   if (Platform.OS === "ios" && isLiquidGlassAvailable()) {
     return (
       <TouchableOpacity onPress={() => router.back()} activeOpacity={0.8}>
-        <GlassView style={styles.glassButton} isInteractive>
-          <ArrowLeft2 variant="Bold" size={20} color="#fff" />
-          <Text style={styles.glassButtonText}>Back</Text>
+        <GlassView style={styles.glassButton}>
+          <ArrowLeft2 size={20} color="#fff" />
         </GlassView>
       </TouchableOpacity>
     );
@@ -40,7 +40,7 @@ function GlassBackButton() {
 export default function VRSceneScreen() {
   return (
     <View style={{ flex: 1 }}>
-      <VRNavigator />
+      <ViroARSceneNavigator initialScene={{ scene: VRSceneWith3D }} />
       <View style={styles.overlay}>
         <GlassBackButton />
       </View>
@@ -57,14 +57,18 @@ const styles = StyleSheet.create({
   glassButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
+    justifyContent: "center",
+    gap: 4,
+    width: 42,
+    height: 42,
+
+    paddingLeft: 8,
+    paddingRight: 12,
     borderRadius: 100,
   },
   glassButtonText: {
     color: "#fff",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
     fontFamily: fontFamily.medium,
   },
