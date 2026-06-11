@@ -16,7 +16,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 ViroARTrackingTargets.createTargets({
   logo: {
-    source: require("@/assets/models/logo.jpg"),
+    source: require("@/assets/models/imgggg.webp"),
     orientation: "Up",
     physicalWidth: 0.1,
   },
@@ -160,9 +160,7 @@ export default function ARSceneScreen() {
         >
           <Text style={styles.exitText}>← Exit AR</Text>
         </TouchableOpacity>
-        <Text style={styles.hint}>
-          Point at logo • Pinch to resize • Two-finger rotate • Drag to move
-        </Text>
+        <Text style={styles.hint}>Check</Text>
       </View>
     </View>
   );
