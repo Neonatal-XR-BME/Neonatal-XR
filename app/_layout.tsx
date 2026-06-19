@@ -60,6 +60,45 @@ export default function RootLayout() {
               headerShown: false,
             }}
           />
+          <Stack.Screen
+            name="mobilevr"
+            options={{
+              animation: "slide_from_right",
+              gestureEnabled: false,
+              headerShown: true,
+            }}
+          />
+          <Stack.Screen
+            name="training/components"
+            options={{
+              animation: "slide_from_right",
+              headerShown: true,
+              headerBackButtonDisplayMode: "minimal",
+
+              headerTransparent: true,
+              headerTitle: "MODULE TWO",
+              headerTitleStyle: { color: "#000", fontWeight: "bold" },
+            }}
+          />
+          <Stack.Screen
+            name="training/procedures"
+            options={{ animation: "slide_from_right", headerShown: false }}
+          />
+          <Stack.Screen
+            name="training/faults"
+            options={{ animation: "slide_from_right", headerShown: false }}
+          />
+          <Stack.Screen
+            name="training/orientation"
+            options={{
+              animation: "slide_from_right",
+              headerShown: true,
+              headerBackButtonDisplayMode: "minimal",
+              headerTransparent: true,
+              headerTitle: "MODULE ONE",
+              headerTitleStyle: { color: "#000", fontWeight: "bold" },
+            }}
+          />
         </Stack>
         <StatusBar
           animated={true}

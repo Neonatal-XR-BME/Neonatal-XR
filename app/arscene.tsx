@@ -152,6 +152,8 @@ export default function ARSceneScreen() {
       <ViroARSceneNavigator
         initialScene={{ scene: NeonatalARScene }}
         style={{ flex: 1 }}
+        autofocus={true}
+        videoQuality="High"
       />
       <View style={styles.overlay}>
         <TouchableOpacity

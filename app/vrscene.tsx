@@ -287,7 +287,7 @@
 //   },
 // });
 
-import VRNavigator from "@/components/vr-view";
+import VRRoomScene from "@/components/vr-view";
 import { ViroARSceneNavigator } from "@reactvision/react-viro";
 import { router } from "expo-router";
 import React from "react";
@@ -298,7 +298,7 @@ export default function VRSceneScreen() {
     <View style={{ flex: 1 }}>
       <ViroARSceneNavigator
         style={{ flex: 1 }}
-        initialScene={{ scene: VRNavigator }}
+        initialScene={{ scene: VRRoomScene }}
       />
       <TouchableOpacity style={styles.exitButton} onPress={() => router.back()}>
         <Text style={styles.exitText}>← Exit VR</Text>
