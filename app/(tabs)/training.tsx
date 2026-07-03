@@ -1,4 +1,3 @@
-import SwipeableScreen from "@/components/swipeablewrapper";
 import { fontFamily } from "@/constants/fontFamily";
 import { MODULES, ModuleMeta } from "@/constants/training-content";
 import { useRouter } from "expo-router";
@@ -34,7 +33,10 @@ function ModuleCard({ module }: { module: ModuleMeta }) {
   const router = useRouter();
   return (
     <Pressable
-      onPress={() => router.push(module.route as any)}
+      onPress={() => {
+        router.push(module.route as any);
+        console.log(`Navigating to ${module.route}`);
+      }}
       android_ripple={{ color: "#E2E2E8" }}
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
@@ -54,23 +56,21 @@ function ModuleCard({ module }: { module: ModuleMeta }) {
 export default function Training() {
   return (
     <SafeAreaProvider>
-      <SwipeableScreen>
-        <SafeAreaView style={styles.screen} edges={["top"]}>
-          <View style={styles.headerBlock}>
-            <Text style={styles.header}>Training</Text>
-            <Text style={styles.subHeader}>Get Familiar with the device</Text>
-          </View>
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {MODULES.map((m) => (
-              <ModuleCard key={m.key} module={m} />
-            ))}
-          </ScrollView>
-        </SafeAreaView>
-      </SwipeableScreen>
+      <SafeAreaView style={styles.screen} edges={["top"]}>
+        <View style={styles.headerBlock}>
+          <Text style={styles.header}>Training</Text>
+          <Text style={styles.subHeader}>Get Familiar with the device</Text>
+        </View>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {MODULES.map((m) => (
+            <ModuleCard key={m.key} module={m} />
+          ))}
+        </ScrollView>
+      </SafeAreaView>
     </SafeAreaProvider>
   );
 }

@@ -1,112 +1,95 @@
-// TemperatureBar.jsx
-import React, { useState } from "react";
+import { CORE_RANGE } from "@/lib/parameter-state";
+import React from "react";
 import { StyleSheet, View } from "react-native";
-import Svg, { Rect } from "react-native-svg";
 
 /**
  * TemperatureBar
  *
- * Props:
- *   temperature  – current temperature value (number)
- *   minTemp      – minimum of the full range (default 35)
- *   maxTemp      – maximum of the full range (default 42)
- *   normalMin    – start of the normal (green) zone (default 36.5)
- *   normalMax    – end of the normal (green) zone (default 37.5)
- *   width        – component width (default 328)
+ * Fills proportionally across [rangeMin, rangeMax] and colors the fill by how
+ * far the value sits from the expected (clinical) band [normalMin, normalMax]:
+ *   - green  : within the normal band
+ *   - yellow : outside the band but by <= tolerance
+ *   - red    : outside the band by more than tolerance
+ *
+ * rangeMin/rangeMax control the visual fill (e.g. core 34 -> set target,
+ * ambient 20 -> 26). normalMin/normalMax control the color only.
  */
 
-const TOTAL_BARS = 55;
-const BAR_WIDTH = 4;
-const BAR_GAP = 2;
-const BAR_HEIGHT = 30;
-const BAR_RADIUS = 2;
+const COLOR_NORMAL = "#0AC084"; // green
+const COLOR_WARN = "#FBEC47"; // yellow
+const COLOR_ALERT = "#FF5252"; // red
 
-const COLOR_LOW = "#FBEC47"; // yellow  – below normal
-const COLOR_NORMAL = "#0AC084"; // green   – normal range
-const COLOR_HIGH = "#FF5252"; // red     – above normal
-const COLOR_EMPTY = "#EEEEEE"; // grey    – unfilled
+const BAR_HEIGHT = 24;
+const BAR_RADIUS = 6;
 
 export interface TemperatureBarProps {
   temperature: number;
-  minTemp?: number;
-  maxTemp?: number;
+  rangeMin?: number;
+  rangeMax?: number;
   normalMin?: number;
   normalMax?: number;
+  tolerance?: number;
+}
+
+export function colorForTemperature(
+  temperature: number,
+  normalMin: number,
+  normalMax: number,
+  tolerance: number
+): string {
+  if (temperature >= normalMin && temperature <= normalMax) {
+    return COLOR_NORMAL;
+  }
+  const deviation =
+    temperature < normalMin ? normalMin - temperature : temperature - normalMax;
+  return deviation <= tolerance ? COLOR_WARN : COLOR_ALERT;
+}
+
+export function fillPercent(
+  temperature: number,
+  rangeMin: number,
+  rangeMax: number
+): number {
+  if (rangeMax <= rangeMin) return 0;
+  const pct = ((temperature - rangeMin) / (rangeMax - rangeMin)) * 100;
+  return Math.max(0, Math.min(100, pct));
 }
 
 export default function TemperatureBar({
   temperature,
-  minTemp = 35,
-  maxTemp = 42,
-  normalMin = 36.1,
-  normalMax = 36.8,
+  rangeMin = 34,
+  rangeMax = 37.5,
+  normalMin = CORE_RANGE.min,
+  normalMax = CORE_RANGE.max,
+  tolerance = 0.2,
 }: TemperatureBarProps) {
-  const [barWidth, setBarWidth] = useState(0);
-
-  // How many bars should be "filled" based on current temperature
-  const filledCount = Math.round(
-    ((temperature - minTemp) / (maxTemp - minTemp)) * TOTAL_BARS
+  const color = colorForTemperature(
+    temperature,
+    normalMin,
+    normalMax,
+    tolerance
   );
-  const clampedFilled = Math.max(0, Math.min(TOTAL_BARS, filledCount));
-
-  // Which bar index does the normal zone start/end at?
-  const normalStartBar = Math.round(
-    ((normalMin - minTemp) / (maxTemp - minTemp)) * TOTAL_BARS
-  );
-  const normalEndBar = Math.round(
-    ((normalMax - minTemp) / (maxTemp - minTemp)) * TOTAL_BARS
-  );
-
-  const bars = Array.from({ length: TOTAL_BARS }, (_, i) => {
-    const x = i * (BAR_WIDTH + BAR_GAP);
-    let fill = COLOR_EMPTY;
-
-    if (i < clampedFilled) {
-      if (i < normalStartBar) {
-        fill = COLOR_LOW; // yellow: below normal
-      } else if (i < normalEndBar) {
-        fill = COLOR_NORMAL; // green: within normal range
-      } else {
-        fill = COLOR_HIGH; // red: above normal
-      }
-    }
-
-    return { x, fill };
-  });
-
-  // Scale SVG to match the desired width prop
-  const svgWidth = TOTAL_BARS * (BAR_WIDTH + BAR_GAP) - BAR_GAP; // 328
-  const scaleX = barWidth / svgWidth;
+  const width = fillPercent(temperature, rangeMin, rangeMax);
 
   return (
-    <View
-      style={[styles.container]}
-      onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
-    >
-      <Svg
-        width={barWidth}
-        height={BAR_HEIGHT}
-        viewBox={`0 0 ${svgWidth} ${BAR_HEIGHT}`}
-        preserveAspectRatio="none"
-      >
-        {bars.map((bar, i) => (
-          <Rect
-            key={i}
-            x={bar.x}
-            y={0}
-            width={BAR_WIDTH}
-            height={BAR_HEIGHT}
-            rx={BAR_RADIUS}
-            fill={bar.fill}
-          />
-        ))}
-      </Svg>
+    <View style={styles.track}>
+      <View
+        style={[styles.fill, { backgroundColor: color, width: `${width}%` }]}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  track: {
     width: "100%",
+    height: BAR_HEIGHT,
+    borderRadius: BAR_RADIUS,
+    backgroundColor: "#EEEEEE",
+    overflow: "hidden",
+  },
+  fill: {
+    height: "100%",
+    borderRadius: BAR_RADIUS,
   },
 });

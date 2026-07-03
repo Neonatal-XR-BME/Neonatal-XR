@@ -37,6 +37,9 @@
         {
           "android": {
             "xRMode": ["GVR", "AR"]
+          },
+          "ios": {
+            "xRMode": ["AR", "GVR"]
           }
         }
       ],

@@ -6,12 +6,28 @@ export interface TemperatureCardProps {
   title: string;
   temperature: number;
   state: string;
+  // Visual fill bounds for the bar.
+  rangeMin?: number;
+  rangeMax?: number;
+  // Clinical normal band for the color (defaults handled in the bar).
+  normalMin?: number;
+  normalMax?: number;
+  // Copy describing the expected range.
+  expectedLabel?: string;
+  // Noun used in the sentence, e.g. "core" or "ambient".
+  metricNoun?: string;
 }
 
 export function TemperatureCard({
   title,
   temperature,
   state,
+  rangeMin,
+  rangeMax,
+  normalMin,
+  normalMax,
+  expectedLabel = "36.5°C - 36.7°C",
+  metricNoun = "core",
 }: TemperatureCardProps) {
   return (
     <View style={styles.card}>
@@ -20,12 +36,19 @@ export function TemperatureCard({
         <Text style={styles.value}>{temperature}</Text>
         <Text style={styles.unit}>°C</Text>
       </View>
-      <TemperatureBar temperature={temperature} />
+      <TemperatureBar
+        temperature={temperature}
+        rangeMin={rangeMin}
+        rangeMax={rangeMax}
+        normalMin={normalMin}
+        normalMax={normalMax}
+      />
       <View style={styles.tempValue}>
         <Text style={styles.text}>
           Average value should be between{" "}
-          <Text style={styles.highlight}>36.7°C - 36.5°C</Text>. The current
-          core temperature is <Text style={styles.highlightTwo}>{state}</Text>
+          <Text style={styles.highlight}>{expectedLabel}</Text>. The current{" "}
+          {metricNoun} temperature is{" "}
+          <Text style={styles.highlightTwo}>{state}</Text>
         </Text>
       </View>
     </View>

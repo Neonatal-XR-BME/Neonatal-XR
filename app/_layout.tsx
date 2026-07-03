@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { Platform, StatusBar } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
+import "react-native-url-polyfill/auto";
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -65,7 +66,7 @@ export default function RootLayout() {
             options={{
               animation: "slide_from_right",
               gestureEnabled: false,
-              headerShown: true,
+              headerShown: false,
             }}
           />
           <Stack.Screen
@@ -82,12 +83,16 @@ export default function RootLayout() {
           />
           <Stack.Screen
             name="training/procedures"
-            options={{ animation: "slide_from_right", headerShown: false }}
+            options={{
+              animation: "slide_from_right",
+              headerShown: true,
+              headerBackButtonDisplayMode: "minimal",
+              headerTransparent: true,
+              headerTitle: "MODULE THREE",
+              headerTitleStyle: { color: "#000", fontWeight: "bold" },
+            }}
           />
-          <Stack.Screen
-            name="training/faults"
-            options={{ animation: "slide_from_right", headerShown: false }}
-          />
+
           <Stack.Screen
             name="training/orientation"
             options={{
