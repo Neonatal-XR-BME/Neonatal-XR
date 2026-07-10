@@ -28,18 +28,29 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "permissions": ["android.permission.CAMERA"]
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
-    "web": { "output": "static", "favicon": "./assets/images/favicon.png" },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
     "plugins": [
       [
         "@reactvision/react-viro",
         {
           "android": {
-            "xRMode": ["GVR", "AR"]
+            "xRMode": [
+              "GVR",
+              "AR"
+            ]
           },
           "ios": {
-            "xRMode": ["AR", "GVR"]
+            "xRMode": [
+              "AR",
+              "GVR"
+            ]
           }
         }
       ],
@@ -59,10 +70,26 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
-          "dark": { "backgroundColor": "#000000" }
+          "dark": {
+            "backgroundColor": "#000000"
+          }
         }
       ]
     ],
-    "experiments": { "typedRoutes": true, "reactCompiler": true }
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "expo-navigation-bar": {
+        "enforceContrast": true,
+        "barStyle": "dark-content",
+        "visiblility": "visible"
+      },
+      "eas": {
+        "projectId": "b1af1645-6ff8-4ed8-90d2-b5837feb4925"
+      }
+    }
   }
 }

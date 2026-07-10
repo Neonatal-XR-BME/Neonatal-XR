@@ -122,7 +122,7 @@ function NeonatalARScene() {
         {modelVisible && (
           <ViroNode position={position}>
             <Viro3DObject
-              source={require("@/assets/models/neonatalXR.glb")}
+              source={require("@/assets/models/3D/noosi.glb")}
               type="GLB"
               scale={scale}
               rotation={rotation}
