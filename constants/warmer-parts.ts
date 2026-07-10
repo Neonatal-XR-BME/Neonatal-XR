@@ -1,15 +1,16 @@
 // Scene + part definitions for the interactive neonatal warmer VR experience.
 //
-// The warmer is now composed of 5 module GLBs (split from the original scan).
-// All modules load at the same position and reassemble the full warmer.
-// Each module is directly tappable:
-//   - overview scene: tapping a module navigates to its detail scene
-//     (or shows an info card for modules without a scene, like the tray)
-//   - detail scenes: the focused module is fully visible, others are dimmed;
-//     sub-part hotspots provide component-level tooltips
+// COORDINATE SYSTEM (measured from the scan GLB):
+//   - The raw scan is Z-up-negative: floor at z=0, top of heater at z=-1.06.
+//   - Model FRONT (control panel / caregiver side) is -Y.
+//   - The scene stands the model upright with a [90,0,0] rotation wrapper,
+//     so all anchors, explodeOffsets, and hotspot positions below are in
+//     RAW MODEL SPACE and rotate together with the geometry.
 //
-// Hotspot `position` values are in the LOCAL space of the model's parent
-// ViroNode. Tune them by eye until each marker hugs its part.
+// Measured module centroids (raw model space):
+//   stand base [0.02, 0.01, -0.07] | column [0, 0, -0.34]
+//   bassinet   [0.01, 0.04, -0.46] | tray   [-0.22, -0.08, -0.72]
+//   controller [-0.01,-0.13, -0.73] | heater [0.01, 0.02, -0.92]
 
 export type Vec3 = [number, number, number];
 
@@ -23,16 +24,11 @@ export type WarmerModule = {
   description: string;
   /** Scene to open when this module is tapped in the overview (optional) */
   targetScene?: SceneKey;
-  /**
-   * Where the module attaches to the stand, in the model's local space.
-   * Derived from the scan's actual module centroids. Used as the start
-   * point of the exploded-view guide line and as the label anchor.
-   */
+  /** Module centroid in raw model space (start of guide line, label anchor) */
   anchor: Vec3;
   /**
-   * Removal-path offset applied in exploded view, in model-local axes.
-   * Mimics how the part physically comes off: heater lifts up the pole,
-   * tray and controller pull out sideways, bassinet slides forward.
+   * Removal-path offset applied in exploded view, in raw model axes:
+   *   up = -Z, front = -Y, tray side = -X.
    */
   explodeOffset: Vec3;
   /** Stagger delay (ms) so parts separate sequentially, not all at once */
@@ -45,7 +41,7 @@ export const WARMER_MODULES: Record<ModuleId, WarmerModule> = {
     label: "Radiant Heater Unit",
     description: "Tap to explore the radiant heater assembly.",
     targetScene: "heater",
-    anchor: [0, 0.03, -0.91],
+    anchor: [0.01, 0.02, -0.92],
     explodeOffset: [0, 0, -0.45], // lifts UP off the pole (model up = -Z)
     explodeDelay: 600,
   },
@@ -54,8 +50,8 @@ export const WARMER_MODULES: Record<ModuleId, WarmerModule> = {
     label: "Baby Carriage (Bassinet)",
     description: "Tap to explore the bassinet and mattress platform.",
     targetScene: "bassinet",
-    anchor: [0.01, 0.03, -0.48],
-    explodeOffset: [0, 0.45, 0], // slides FORWARD off the column
+    anchor: [0.01, 0.04, -0.46],
+    explodeOffset: [0, -0.45, 0], // slides FORWARD off the column (front = -Y)
     explodeDelay: 400,
   },
   controller: {
@@ -63,8 +59,8 @@ export const WARMER_MODULES: Record<ModuleId, WarmerModule> = {
     label: "Control Panel",
     description: "Tap to explore the controller and alarm system.",
     targetScene: "controller",
-    anchor: [0.03, -0.15, -0.69],
-    explodeOffset: [0.5, 0, 0], // pulls out to the side
+    anchor: [-0.01, -0.13, -0.73],
+    explodeOffset: [0.5, 0, 0], // pulls out sideways (away from the tray side)
     explodeDelay: 200,
   },
   tray: {
@@ -72,8 +68,8 @@ export const WARMER_MODULES: Record<ModuleId, WarmerModule> = {
     label: "Instrument Tray",
     description:
       "Side shelf for instruments and supplies, keeping essentials within the caregiver's reach during procedures.",
-    anchor: [-0.19, -0.07, -0.71],
-    explodeOffset: [-0.5, 0, 0], // slides out on its own side
+    anchor: [-0.22, -0.08, -0.72],
+    explodeOffset: [-0.5, 0, 0], // slides out on its own side (-X)
     explodeDelay: 0,
   },
   stand: {
@@ -81,7 +77,7 @@ export const WARMER_MODULES: Record<ModuleId, WarmerModule> = {
     label: "Stand & IV Pole",
     description:
       "Support column, legs and casters that carry the unit, plus the IV pole hooks for fluid bags. Casters lock to keep the warmer stationary.",
-    anchor: [0, 0, -0.3],
+    anchor: [0.02, 0.01, -0.3],
     explodeOffset: [0, 0, 0], // the stand is the fixed anchor of the assembly
     explodeDelay: 0,
   },
@@ -99,7 +95,7 @@ export type WarmerPart = {
   id: string;
   label: string;
   description: string;
-  /** Hotspot position relative to the model node */
+  /** Hotspot position in RAW MODEL SPACE (inside the rotation wrapper) */
   position: Vec3;
 };
 
@@ -116,16 +112,20 @@ export type WarmerScene = {
   parts: WarmerPart[];
 };
 
+// Framing math: with the [0,-0.9,0] inner offset and the upright wrapper,
+// world height of a model point z is:  pos.y + scale * (-0.9 - z)
+// (z is negative going up, so -z is the point's height above the floor).
 export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
   // ----- SCENE 1: principal / overview -----
   overview: {
     key: "overview",
     title: "Neonatal Warmer Overview",
     subtitle: "Tap a part of the warmer to explore it",
-    modelPosition: [0, -0.5, -2],
-    modelScale: [1.6, 1.6, 1.6],
+    // Bigger: 1.6 -> 2.4. Lowered for handheld AR viewing (phone camera
+    // height, not standing eye height).
+    modelPosition: [0, -0.1, -2.4],
+    modelScale: [2.4, 2.4, 2.4],
     modelRotation: [0, 0, 0],
-    // No floating nav markers anymore: the modules themselves are tappable.
     parts: [],
   },
 
@@ -135,7 +135,8 @@ export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
     title: "Radiant Heater Unit",
     subtitle: "Tap a marker to learn what each component does",
     focusModule: "heater",
-    modelPosition: [0, -1.2, -1.6],
+    // Heater head (z=-0.92) near camera height, lowered for handheld AR
+    modelPosition: [0, -0.4, -1.6],
     modelScale: [2.2, 2.2, 2.2],
     modelRotation: [0, 0, 0],
     parts: [
@@ -144,21 +145,21 @@ export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
         label: "Heating Element",
         description:
           "Quartz/ceramic radiant element that emits infrared energy downward to warm the infant without warming the surrounding air.",
-        position: [0, 0.95, 0],
+        position: [0, 0.02, -0.96],
       },
       {
         id: "reflector",
         label: "Parabolic Reflector",
         description:
           "Focuses and evenly distributes infrared radiation across the mattress area so there are no hot or cold spots.",
-        position: [0.15, 0.9, 0.05],
+        position: [0.06, 0.12, -0.93],
       },
       {
         id: "heater-guard",
         label: "Protective Grill",
         description:
           "Metal guard that prevents accidental contact with the hot element and stops objects falling onto the infant.",
-        position: [0, 0.82, 0.1],
+        position: [0, 0.02, -0.85],
       },
     ],
   },
@@ -169,7 +170,8 @@ export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
     title: "Baby Carriage (Bassinet)",
     subtitle: "Tap a marker to learn what each component does",
     focusModule: "bassinet",
-    modelPosition: [0, -0.3, -1.4],
+    // Bassinet (z=-0.46) near camera height, lowered for handheld AR
+    modelPosition: [0, 0.4, -1.5],
     modelScale: [2.0, 2.0, 2.0],
     modelRotation: [0, 0, 0],
     parts: [
@@ -178,21 +180,21 @@ export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
         label: "Mattress Platform",
         description:
           "X-ray translucent platform that supports the infant. Often tiltable (Trendelenburg / reverse) for clinical procedures.",
-        position: [0, -0.15, 0.2],
+        position: [0, 0.04, -0.58],
       },
       {
         id: "side-panels",
         label: "Drop-down Side Panels",
         description:
           "Transparent side walls that keep the infant safe while allowing observation. They fold down for full access during procedures.",
-        position: [0.35, -0.05, 0.2],
+        position: [0.15, 0.04, -0.55],
       },
       {
         id: "skin-probe",
         label: "Skin Temperature Probe",
         description:
           "Sensor attached to the infant's skin. Feeds temperature readings to the controller for servo (baby-controlled) mode.",
-        position: [-0.2, -0.12, 0.25],
+        position: [-0.08, -0.14, -0.55],
       },
     ],
   },
@@ -203,7 +205,8 @@ export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
     title: "Control Panel",
     subtitle: "Tap a marker to learn what each component does",
     focusModule: "controller",
-    modelPosition: [-0.4, -0.5, -1.3],
+    // Controller (z=-0.73) near camera height, lowered for handheld AR
+    modelPosition: [0, 0, -1.4],
     modelScale: [2.2, 2.2, 2.2],
     modelRotation: [0, -20, 0],
     parts: [
@@ -212,21 +215,21 @@ export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
         label: "Temperature Display",
         description:
           "Shows set temperature, measured skin temperature, and heater output percentage at a glance.",
-        position: [0.45, 0.15, 0.2],
+        position: [0, -0.21, -0.75],
       },
       {
         id: "mode-select",
         label: "Mode Selector",
         description:
           "Switches between Manual mode (fixed heater power) and Servo mode (auto-adjusts power based on the skin probe).",
-        position: [0.45, 0.05, 0.2],
+        position: [0.06, -0.21, -0.7],
       },
       {
         id: "alarms",
         label: "Alarm System",
         description:
           "Audible and visual alarms for high/low temperature, probe failure, and power interruption to keep the infant safe.",
-        position: [0.52, 0.1, 0.2],
+        position: [-0.06, -0.21, -0.77],
       },
     ],
   },

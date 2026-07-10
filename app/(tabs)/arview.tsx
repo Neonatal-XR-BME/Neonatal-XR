@@ -47,6 +47,18 @@ const cards = [
     dotColor: "#00A651",
     icon: "glasses-outline" as const,
   },
+
+  {
+    id: "electricalVr",
+    title: "Electrical\nSimulation",
+    description:
+      "Check your camera permission first. Then you can try to interact with the 3D model in your virtual environment.",
+    route: "/electricVr",
+    buttonText: "LAUNCH VR",
+    colors: ["#b871ff", "#9c39ff"] as const,
+    dotColor: "#b871ff",
+    icon: "glasses-outline" as const,
+  },
 ];
 
 export default function ARViewTab() {

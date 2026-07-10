@@ -57,7 +57,7 @@ export const MODULES: ModuleMeta[] = [
     blurb: "Symptom to cause reasoning and the safety rules that follow",
     accent: "#9EE9C5",
     icon: "warning",
-    route: "/mobilevr",
+    route: "/training/assessment",
   },
 ];
 

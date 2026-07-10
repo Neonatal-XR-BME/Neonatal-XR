@@ -64,7 +64,10 @@ export default function HomeScreen() {
               <CloudAdd variant="Bold" color={statusColor} size={36} />
               <Pressable
                 onPress={() => {
-                  sendDeviceCommand("SYSTEM_ENABLE", 1);
+                  sendDeviceCommand(
+                    "SYSTEM_ENABLE",
+                    row?.system_enabled ? 0 : 1
+                  );
                 }}
               >
                 <Power />

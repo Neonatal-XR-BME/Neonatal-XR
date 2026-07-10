@@ -88,35 +88,15 @@ export default function VRRoomScene() {
       {/* Warmer model, rotated by gaze+click */}
       <ViroNode position={[0, -0.5, -2]} rotation={[rotX, rotY, 0]}>
         <Viro3DObject
-          source={require("@/assets/models/neonatalXR.glb")}
+          source={require("@/assets/models/3D/nooosi.glb")}
           type="GLB"
-          scale={[1.6, 1.6, 1.6]}
-          position={[0, -0.9, 0]}
+          scale={[0.002, 0.002, 0.002]}
+          position={[0, -0.9, 0.7]}
           onError={(e: any) => console.error("VR model error:", e)}
         />
       </ViroNode>
 
       {/* Arrow controls around the model */}
-      <ArrowTarget
-        label="<"
-        position={[-1.4, -0.5, -2]}
-        onPress={() => rotate("y", -1)}
-      />
-      <ArrowTarget
-        label=">"
-        position={[1.4, -0.5, -2]}
-        onPress={() => rotate("y", 1)}
-      />
-      <ArrowTarget
-        label="^"
-        position={[0, 0.6, -2]}
-        onPress={() => rotate("x", -1)}
-      />
-      <ArrowTarget
-        label="v"
-        position={[0, -1.6, -2]}
-        onPress={() => rotate("x", 1)}
-      />
 
       {/* Center gaze reticle: a small dot fixed in front of the camera */}
       <ViroNode position={[0, 0, -1]}>

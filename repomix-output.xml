@@ -48,12 +48,13 @@ app/
     training.tsx
     troubleshoot.tsx
   training/
+    assessment.tsx
     components.tsx
-    faults.tsx
     orientation.tsx
     procedures.tsx
   _layout.tsx
   arscene.tsx
+  electricVr.tsx
   mobilevr.tsx
   modal.tsx
   vrscene.tsx
@@ -99,6 +100,7 @@ components/
     icon-symbol.tsx
   circuitry.tsx
   details-card.tsx
+  electrical-vr-room-scene.tsx
   external-link.tsx
   haptic-tab.tsx
   hello-wave.tsx
@@ -114,11 +116,13 @@ components/
   vr-room-scene.tsx
   vr-view.tsx
 constants/
+  assessment-content.ts
   components-content.ts
   fontFamily.ts
   procedures-content.ts
   theme.ts
   training-content.ts
+  warmer-elements.ts
   warmer-parts.ts
 hooks/
   use-color-scheme.ts
@@ -146,27 +150,146 @@ tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="app/training/procedures.tsx">
+<file path="app/training/assessment.tsx">
+import { ASSESSMENT, AssessmentQuestion } from "@/constants/assessment-content";
 import { fontFamily } from "@/constants/fontFamily";
-import { PROCEDURES } from "@/constants/procedures-content";
 import { useRouter } from "expo-router";
-import { ArrowLeft, ArrowRight, TickCircle } from "iconsax-react-nativejs";
-import React, { useState } from "react";
+import {
+  ArrowLeft,
+  CloseCircle,
+  Refresh,
+  TickCircle,
+} from "iconsax-react-nativejs";
+import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-function MaintenanceRow({ text }: { text: string }) {
+// answers[questionId] = selected option index
+type AnswerMap = Record<string, number>;
+
+const TYPE_TAG: Record<AssessmentQuestion["type"], string> = {
+  mcq: "MULTIPLE CHOICE",
+  tf: "TRUE / FALSE",
+  match: "SYMPTOM TO CAUSE",
+};
+
+function QuestionCard({
+  question,
+  qNumber,
+  selected,
+  submitted,
+  onSelect,
+}: {
+  question: AssessmentQuestion;
+  qNumber: number;
+  selected: number | undefined;
+  submitted: boolean;
+  onSelect: (index: number) => void;
+}) {
   return (
-    <View style={styles.itemRow}>
-      <TickCircle size={20} color="#0AC084" variant="Bold" />
-      <Text style={styles.itemText}>{text}</Text>
+    <View style={styles.card}>
+      <Text style={styles.typeTag}>{TYPE_TAG[question.type]}</Text>
+
+      {question.type === "match" && question.symptom && (
+        <View style={styles.symptomBox}>
+          <Text style={styles.symptomLabel}>SYMPTOM</Text>
+          <Text style={styles.symptomText}>{question.symptom}</Text>
+        </View>
+      )}
+
+      <Text style={styles.prompt}>
+        {qNumber}. {question.prompt}
+      </Text>
+
+      {question.options.map((option, i) => {
+        const isSelected = selected === i;
+        const isCorrect = i === question.correctIndex;
+
+        // After submission, color the correct option green and a wrong
+        // selection red. Before submission, only highlight the selection.
+        const showCorrect = submitted && isCorrect;
+        const showWrong = submitted && isSelected && !isCorrect;
+
+        return (
+          <Pressable
+            key={option}
+            disabled={submitted}
+            onPress={() => onSelect(i)}
+            android_ripple={{ color: "#E2E2E8" }}
+            style={({ pressed }) => [
+              styles.option,
+              isSelected && !submitted && styles.optionSelected,
+              showCorrect && styles.optionCorrect,
+              showWrong && styles.optionWrong,
+              pressed && !submitted && styles.optionPressed,
+            ]}
+          >
+            <View
+              style={[
+                styles.radio,
+                isSelected && !submitted && styles.radioSelected,
+                showCorrect && styles.radioCorrect,
+                showWrong && styles.radioWrong,
+              ]}
+            >
+              {(isSelected || showCorrect) && <View style={styles.radioDot} />}
+            </View>
+            <Text
+              style={[
+                styles.optionText,
+                isSelected && !submitted && styles.optionTextSelected,
+                showCorrect && styles.optionTextCorrect,
+                showWrong && styles.optionTextWrong,
+              ]}
+            >
+              {option}
+            </Text>
+          </Pressable>
+        );
+      })}
+
+      {submitted && (
+        <View style={styles.explanationBox}>
+          {selected === question.correctIndex ? (
+            <TickCircle size={18} color="#0AC084" variant="Bold" />
+          ) : (
+            <CloseCircle size={18} color="#FF5252" variant="Bold" />
+          )}
+          <Text style={styles.explanationText}>{question.explanation}</Text>
+        </View>
+      )}
     </View>
   );
 }
 
-export default function Procedures() {
+export default function Assessment() {
   const router = useRouter();
-  const [completed, setCompleted] = useState(false);
+  const [answers, setAnswers] = useState<AnswerMap>({});
+  const [submitted, setSubmitted] = useState(false);
+
+  const total = ASSESSMENT.questions.length;
+  const answeredCount = Object.keys(answers).length;
+  const allAnswered = answeredCount === total;
+
+  const score = useMemo(() => {
+    if (!submitted) return 0;
+    return ASSESSMENT.questions.reduce(
+      (sum, q) => sum + (answers[q.id] === q.correctIndex ? 1 : 0),
+      0
+    );
+  }, [submitted, answers]);
+
+  const percent = Math.round((score / total) * 100);
+  const passed = percent >= ASSESSMENT.passMark;
+
+  const select = (id: string, index: number) => {
+    setAnswers((prev) => ({ ...prev, [id]: index }));
+  };
+
+  const retake = () => {
+    setAnswers({});
+    setSubmitted(false);
+  };
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
@@ -176,77 +299,98 @@ export default function Procedures() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.pageTitle}>
-          {PROCEDURES.number}. {PROCEDURES.title}
+          {ASSESSMENT.number}. {ASSESSMENT.title}
         </Text>
-        <Text style={styles.intro}>{PROCEDURES.intro}</Text>
+        <Text style={styles.intro}>{ASSESSMENT.intro}</Text>
 
-        <View style={styles.callout}>
-          <Text style={styles.calloutLabel}>{PROCEDURES.calloutLabel}</Text>
-          <Text style={styles.calloutBody}>{PROCEDURES.calloutBody}</Text>
-        </View>
-
-        <Text style={styles.sectionHeading}>
-          {PROCEDURES.maintenanceNumber} {PROCEDURES.maintenanceHeading}
-        </Text>
-
-        {PROCEDURES.groups.map((group) => (
-          <View key={group.heading} style={styles.group}>
-            <View style={styles.groupHeadRow}>
-              <Text style={styles.groupHeading}>{group.heading}</Text>
-            </View>
-            <View style={styles.itemsCard}>
-              {group.items.map((item) => (
-                <MaintenanceRow key={item.text} text={item.text} />
-              ))}
-            </View>
-          </View>
-        ))}
-
-        <View style={styles.safetyCallout}>
-          <Text style={styles.safetyLabel}>{PROCEDURES.safetyLabel}</Text>
-          <Text style={styles.safetyBody}>{PROCEDURES.safetyBody}</Text>
-        </View>
-
-        <Text style={styles.sectionHeading}>
-          {PROCEDURES.troubleshootingNumber} {PROCEDURES.troubleshootingHeading}
-        </Text>
-        <Text style={styles.body}>{PROCEDURES.troubleshootingIntro}</Text>
-
-        {PROCEDURES.faults.map((fault) => (
-          <View key={fault.symptom} style={styles.faultCard}>
-            <Text style={styles.faultSymptom}>{fault.symptom}</Text>
-            <Text style={styles.faultCausesLabel}>POSSIBLE CAUSES</Text>
-            {fault.causes.map((cause) => (
-              <View key={cause} style={styles.causeRow}>
-                <Text style={styles.causeDot}>•</Text>
-                <Text style={styles.causeText}>{cause}</Text>
-              </View>
-            ))}
-          </View>
-        ))}
-
-        <Pressable
-          onPress={() => setCompleted((c) => !c)}
-          android_ripple={{ color: "#E2E2E8" }}
-          style={({ pressed }) => [
-            styles.completeBtn,
-            completed && styles.completeBtnActive,
-            pressed && styles.completeBtnPressed,
-          ]}
-        >
-          <Text
+        {/* Score card, shown after submission */}
+        {submitted && (
+          <View
             style={[
-              styles.completeBtnText,
-              completed && styles.completeBtnTextActive,
+              styles.scoreCard,
+              { backgroundColor: passed ? "#E7FBF2" : "#FFECEC" },
             ]}
           >
-            {completed ? "MODULE COMPLETE" : "MARK MODULE COMPLETE"}
-          </Text>
-        </Pressable>
+            <Text style={styles.scoreLabel}>YOUR SCORE</Text>
+            <Text
+              style={[
+                styles.scoreValue,
+                { color: passed ? "#0B6B45" : "#C0392B" },
+              ]}
+            >
+              {score}/{total} ({percent}%)
+            </Text>
+            <Text style={styles.scoreVerdict}>
+              {passed
+                ? "Passed. Review the explanations below to reinforce anything you missed."
+                : `Below the ${ASSESSMENT.passMark}% pass mark. Review the explanations below, then retake the assessment.`}
+            </Text>
+          </View>
+        )}
+
+        {/* Progress, shown before submission */}
+        {!submitted && (
+          <View style={styles.progressRow}>
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${(answeredCount / total) * 100}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {answeredCount}/{total}
+            </Text>
+          </View>
+        )}
+
+        {ASSESSMENT.questions.map((q, i) => (
+          <QuestionCard
+            key={q.id}
+            question={q}
+            qNumber={i + 1}
+            selected={answers[q.id]}
+            submitted={submitted}
+            onSelect={(index) => select(q.id, index)}
+          />
+        ))}
+
+        {/* Submit / Retake */}
+        {!submitted ? (
+          <Pressable
+            onPress={() => setSubmitted(true)}
+            disabled={!allAnswered}
+            android_ripple={allAnswered ? { color: "#2A5BFF" } : undefined}
+            style={({ pressed }) => [
+              styles.submitBtn,
+              !allAnswered && styles.submitBtnDisabled,
+              allAnswered && pressed && styles.submitBtnPressed,
+            ]}
+          >
+            <Text style={styles.submitBtnText}>
+              {allAnswered
+                ? "SUBMIT ANSWERS"
+                : `ANSWER ALL QUESTIONS (${answeredCount}/${total})`}
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={retake}
+            android_ripple={{ color: "#E2E2E8" }}
+            style={({ pressed }) => [
+              styles.retakeBtn,
+              pressed && styles.retakeBtnPressed,
+            ]}
+          >
+            <Refresh size={16} color="#1A1A1A" variant="Linear" />
+            <Text style={styles.retakeBtnText}>RETAKE ASSESSMENT</Text>
+          </Pressable>
+        )}
 
         <View style={styles.navRow}>
           <Pressable
-            onPress={() => router.push("/training/components" as any)}
+            onPress={() => router.push("/training/procedures" as any)}
             android_ripple={{ color: "#E2E2E8" }}
             style={({ pressed }) => [
               styles.navBtnGhost,
@@ -254,19 +398,7 @@ export default function Procedures() {
             ]}
           >
             <ArrowLeft size={16} color="#1A1A1A" variant="Linear" />
-            <Text style={styles.navBtnGhostText}>Components</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push("/training/faults" as any)}
-            android_ripple={{ color: "#2A5BFF" }}
-            style={({ pressed }) => [
-              styles.navBtnSolid,
-              pressed && styles.navBtnPressed,
-            ]}
-          >
-            <Text style={styles.navBtnSolidText}>Knowledge Check</Text>
-            <ArrowRight size={16} color="#FFFFFF" variant="Linear" />
+            <Text style={styles.navBtnGhostText}>Procedures</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -276,15 +408,9 @@ export default function Procedures() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F4F4F8" },
-  scroll: { flex: 1 },
+  scroll: { flex: 1, paddingTop: 48 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 28 },
-  moduleLabel: {
-    fontSize: 12,
-    fontFamily: fontFamily.bold,
-    color: "#0749FF",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
+
   pageTitle: {
     fontSize: 18,
     fontFamily: fontFamily.bold,
@@ -298,157 +424,228 @@ const styles = StyleSheet.create({
     color: "#3D3D3D",
     lineHeight: 23,
     letterSpacing: -0.2,
+    marginBottom: 20,
   },
-  callout: {
-    marginTop: 18,
-  },
-  calloutLabel: {
-    fontSize: 14,
-    fontFamily: fontFamily.bold,
-    color: "#1A1A1A",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  calloutBody: {
-    fontSize: 14,
-    fontFamily: fontFamily.regular,
-    color: "#3D3D3D",
-    lineHeight: 21,
-    letterSpacing: -0.2,
-  },
-  sectionHeading: {
-    marginTop: 32,
-    marginBottom: 24,
-    fontSize: 16,
-    fontFamily: fontFamily.bold,
-    color: "#1A1A1A",
-    letterSpacing: -0.3,
-  },
-  group: { marginBottom: 24 },
-  groupHeadRow: {
+
+  // Progress
+  progressRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 9,
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: 20,
   },
-  groupHeading: {
-    fontSize: 15,
-    fontFamily: fontFamily.bold,
-    color: "#1A1A1A",
-    letterSpacing: -0.2,
-    textTransform: "uppercase",
-  },
-  itemsCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 14,
-    gap: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
-  itemRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-  },
-  itemText: {
+  progressTrack: {
     flex: 1,
-    fontSize: 13.5,
-    fontFamily: fontFamily.regular,
-    color: "#3D3D3D",
-    lineHeight: 20,
-    letterSpacing: -0.2,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#E2E2E8",
+    overflow: "hidden",
   },
-  safetyCallout: {},
-  safetyLabel: {
-    fontSize: 14,
-    fontFamily: fontFamily.bold,
-    color: "#C0392B",
+  progressFill: {
+    height: "100%",
+    borderRadius: 4,
+    backgroundColor: "#0749FF",
+  },
+  progressText: {
+    fontSize: 12,
+    fontFamily: fontFamily.semibold,
+    color: "#6B6B6B",
+  },
+
+  // Score card
+  scoreCard: {
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 20,
+    gap: 6,
+  },
+  scoreLabel: {
+    fontSize: 12,
+    fontFamily: fontFamily.regular,
+    color: "#6B6B6B",
     letterSpacing: 1,
-    marginBottom: 8,
   },
-  safetyBody: {
-    fontSize: 13.5,
-    fontFamily: fontFamily.regular,
-    color: "#9f1300ff",
-    lineHeight: 21,
-    letterSpacing: -0.2,
-  },
-  body: {
-    fontSize: 14,
-    fontFamily: fontFamily.regular,
-    color: "#3D3D3D",
-    lineHeight: 23,
-    letterSpacing: -0.2,
-    marginBottom: 8,
-  },
-  faultCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
-  faultSymptom: {
-    fontSize: 15,
+  scoreValue: {
+    fontSize: 28,
     fontFamily: fontFamily.bold,
-    color: "#1A1A1A",
-    letterSpacing: -0.2,
-    marginBottom: 12,
+    letterSpacing: -0.5,
   },
-  faultCausesLabel: {
-    fontSize: 11,
-    fontFamily: fontFamily.bold,
-    color: "#9A9AA0",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  causeRow: { flexDirection: "row", marginBottom: 4 },
-  causeDot: {
-    fontSize: 14,
-    color: "#0749FF",
-    width: 14,
-    lineHeight: 20,
-  },
-  causeText: {
-    flex: 1,
-    fontSize: 13.5,
+  scoreVerdict: {
+    fontSize: 13,
     fontFamily: fontFamily.regular,
     color: "#3D3D3D",
     lineHeight: 20,
     letterSpacing: -0.2,
   },
-  completeBtn: {
-    marginTop: 22,
-    height: 56,
+
+  // Question card
+  card: {
     borderRadius: 16,
     backgroundColor: "#FFFFFF",
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
+  },
+  typeTag: {
+    fontSize: 11,
+    fontFamily: fontFamily.regular,
+    color: "#9A9AA0",
+    letterSpacing: 1,
+    marginBottom: 10,
+  },
+  symptomBox: {
+    backgroundColor: "#1B2B3F",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+    gap: 4,
+    borderRadius: 6,
+  },
+  symptomLabel: {
+    fontSize: 10,
+    fontFamily: fontFamily.regular,
+    color: "#9BE7C4",
+    letterSpacing: 1,
+  },
+  symptomText: {
+    fontSize: 14,
+    fontFamily: fontFamily.semibold,
+    color: "#FFFFFF",
+    letterSpacing: -0.2,
+  },
+  prompt: {
+    fontSize: 14.5,
+    fontFamily: fontFamily.semibold,
+    color: "#1A1A1A",
+    lineHeight: 22,
+    letterSpacing: -0.2,
+    marginBottom: 14,
+  },
+
+  // Options
+  option: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2E2E8",
+    backgroundColor: "#FAFAFC",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  optionPressed: { transform: [{ scale: 0.995 }] },
+  optionSelected: {
+    borderColor: "#0749FF",
+    backgroundColor: "#EEF3FF",
+  },
+  optionCorrect: {
+    borderColor: "#0AC084",
+    backgroundColor: "#E7FBF2",
+  },
+  optionWrong: {
+    borderColor: "#FF5252",
+    backgroundColor: "#FFECEC",
+  },
+  optionText: {
+    flex: 1,
+    fontSize: 13.5,
+    fontFamily: fontFamily.regular,
+    color: "#3D3D3D",
+    lineHeight: 20,
+    letterSpacing: -0.2,
+  },
+  optionTextSelected: { color: "#0749FF", fontFamily: fontFamily.medium },
+  optionTextCorrect: { color: "#0B6B45", fontFamily: fontFamily.medium },
+  optionTextWrong: { color: "#C0392B", fontFamily: fontFamily.medium },
+
+  radio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: "#C6C6CE",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#0749FF",
+  },
+  radioSelected: { borderColor: "#0749FF" },
+  radioCorrect: { borderColor: "#0AC084" },
+  radioWrong: { borderColor: "#FF5252" },
+  radioDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#0749FF",
+  },
+
+  // Explanation
+  explanationBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 6,
+    borderRadius: 12,
+    backgroundColor: "#F4F4F8",
+    padding: 12,
+  },
+  explanationText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontFamily: fontFamily.regular,
+    color: "#3D3D3D",
+    lineHeight: 19,
+    letterSpacing: -0.2,
+  },
+
+  // Submit / retake
+  submitBtn: {
+    marginTop: 12,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: "#0749FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitBtnDisabled: { backgroundColor: "#C7D0DD" },
+  submitBtnPressed: {
+    backgroundColor: "#0640DB",
+    transform: [{ scale: 0.99 }],
+  },
+  submitBtnText: {
+    fontSize: 14,
+    fontFamily: fontFamily.semibold,
+    color: "#FFFFFF",
+    letterSpacing: 0.2,
+  },
+  retakeBtn: {
+    marginTop: 12,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
     shadowColor: "#000",
     shadowOpacity: 0.03,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
   },
-  completeBtnActive: { backgroundColor: "#E8F0FF" },
-  completeBtnPressed: { transform: [{ scale: 0.99 }] },
-  completeBtnText: {
+  retakeBtnPressed: { transform: [{ scale: 0.99 }] },
+  retakeBtnText: {
     fontSize: 14,
     fontFamily: fontFamily.semibold,
-    color: "#0749FF",
+    color: "#1A1A1A",
     letterSpacing: 0.2,
   },
-  completeBtnTextActive: { color: "#0749FF" },
+
+  // Bottom nav
   navRow: { flexDirection: "row", gap: 12, marginTop: 12 },
   navBtnGhost: {
     flex: 1,
@@ -471,512 +668,599 @@ const styles = StyleSheet.create({
     color: "#1A1A1A",
     letterSpacing: -0.2,
   },
-  navBtnSolid: {
-    flex: 1,
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: "#1B2B3F",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  navBtnSolidText: {
-    fontSize: 13,
-    fontFamily: fontFamily.semibold,
-    color: "#FFFFFF",
-    letterSpacing: -0.2,
-  },
   navBtnPressed: { transform: [{ scale: 0.99 }] },
 });
 </file>
 
-<file path="assets/images/Power.svg">
-<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="0.285714" y="0.285714" width="31.4286" height="31.4286" rx="15.7143" fill="url(#paint0_linear_199_758)"/>
-<rect x="0.285714" y="0.285714" width="31.4286" height="31.4286" rx="15.7143" stroke="url(#paint1_linear_199_758)" stroke-width="0.571429"/>
-<g clip-path="url(#clip0_199_758)">
-<path d="M16 8V15.5" stroke="white" stroke-width="2.0625" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M20.8 11.4502C21.7425 12.393 22.3847 13.5938 22.6456 14.9012C22.9065 16.2085 22.7745 17.5638 22.2661 18.7962C21.7578 20.0286 20.8959 21.0829 19.7891 21.8261C18.6824 22.5692 17.3804 22.9681 16.0473 22.9723C14.7142 22.9764 13.4097 22.5858 12.2983 21.8495C11.1869 21.1133 10.3184 20.0644 9.80239 18.8352C9.28633 17.6061 9.1458 16.2516 9.39853 14.9427C9.65126 13.6337 10.2859 12.4289 11.2225 11.4802" stroke="white" stroke-width="2.0625" stroke-linecap="round" stroke-linejoin="round"/>
-</g>
-<defs>
-<linearGradient id="paint0_linear_199_758" x1="16" y1="0" x2="16" y2="32" gradientUnits="userSpaceOnUse">
-<stop stop-color="#00B377"/>
-<stop offset="0.487782" stop-color="#009463"/>
-<stop offset="1" stop-color="#005237"/>
-</linearGradient>
-<linearGradient id="paint1_linear_199_758" x1="16" y1="-6.85714" x2="16" y2="32" gradientUnits="userSpaceOnUse">
-<stop stop-color="#04E59B"/>
-<stop offset="1" stop-color="#003D29"/>
-</linearGradient>
-<clipPath id="clip0_199_758">
-<rect width="18" height="18" fill="white" transform="translate(7 6.5)"/>
-</clipPath>
-</defs>
-</svg>
-</file>
+<file path="app/electricVr.tsx">
+import ElectricalVRRoomScene from "@/components/electrical-vr-room-scene";
+import { ViroMaterials, ViroVRSceneNavigator } from "@reactvision/react-viro";
+import { router } from "expo-router";
+import React from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-<file path="components/temperature-slider.tsx">
-import { fontFamily } from "@/constants/fontFamily";
-import React, { useState } from "react";
-import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-} from "react-native-reanimated";
-
-const THUMB_SIZE = 28;
-const TRACK_HEIGHT = 10;
-
-export interface TemperatureSliderProps {
-  min?: number;
-  max?: number;
-  step?: number;
-  value: number;
-  onChange: (value: number) => void;
-}
-
-function roundToStep(raw: number, min: number, step: number): number {
-  const stepped = Math.round((raw - min) / step) * step + min;
-  return Number(stepped.toFixed(2));
-}
-
-export default function TemperatureSlider({
-  min = 33,
-  max = 39.5,
-  step = 0.1,
-  value,
-  onChange,
-}: TemperatureSliderProps) {
-  const [trackWidth, setTrackWidth] = useState(0);
-
-  const offset = useSharedValue(0);
-  const startOffset = useSharedValue(0);
-
-  const usable = Math.max(0, trackWidth - THUMB_SIZE);
-
-  React.useEffect(() => {
-    if (usable <= 0 || max <= min) return;
-    const ratio = (value - min) / (max - min);
-    offset.value = Math.max(0, Math.min(usable, ratio * usable));
-  }, [value, usable, min, max, offset]);
-
-  const commit = (px: number) => {
-    if (usable <= 0) return;
-    const ratio = px / usable;
-    const raw = min + ratio * (max - min);
-    onChange(roundToStep(raw, min, step));
-  };
-
-  const pan = Gesture.Pan()
-    .onStart(() => {
-      startOffset.value = offset.value;
-    })
-    .onUpdate((e) => {
-      const next = Math.max(
-        0,
-        Math.min(usable, startOffset.value + e.translationX)
-      );
-      offset.value = next;
-      runOnJS(commit)(next);
-    });
-
-  const tap = Gesture.Tap().onEnd((e) => {
-    const next = Math.max(0, Math.min(usable, e.x - THUMB_SIZE / 2));
-    offset.value = next;
-    runOnJS(commit)(next);
+// Register materials once at module load. Guard so fast-refresh re-runs don't
+// throw on duplicate registration.
+try {
+  ViroMaterials.createMaterials({
+    arrowIdle: { diffuseColor: "rgba(255,255,255,0.18)" },
+    arrowActive: { diffuseColor: "rgba(7,73,255,0.55)" },
+    reticle: { diffuseColor: "rgba(255,255,255,0.9)" },
   });
+} catch {
+  // already registered
+}
 
-  const gesture = Gesture.Race(pan, tap);
-
-  const thumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: offset.value }],
-  }));
-
-  const fillStyle = useAnimatedStyle(() => ({
-    width: offset.value + THUMB_SIZE / 2,
-  }));
-
-  const onLayout = (e: LayoutChangeEvent) => {
-    setTrackWidth(e.nativeEvent.layout.width);
-  };
-
+/**
+ * Mobile VR screen for Google Cardboard / Shinecon on Android (GVR).
+ *
+ * Stereo via ViroVRSceneNavigator + vrModeEnabled. Rotation of the model is
+ * handled inside the scene via gaze + remote click (see vr-room-scene).
+ * onExitViro navigates away so the view isn't left blank after exit.
+ */
+export default function MobileVRScreen() {
   return (
-    <View style={styles.wrapper}>
-      <GestureDetector gesture={gesture}>
-        <View style={styles.trackArea} onLayout={onLayout}>
-          <View style={styles.trackBg} />
-          <Animated.View style={[styles.trackFill, fillStyle]} />
-          <Animated.View style={[styles.thumb, thumbStyle]} />
-        </View>
-      </GestureDetector>
-
-      <View style={styles.labels}>
-        <Text style={styles.label}>{min}°C</Text>
-        <Text style={styles.label}>{max}°C</Text>
-      </View>
+    <View style={styles.container}>
+      <ViroVRSceneNavigator
+        vrModeEnabled={true}
+        pbrEnabled
+        initialScene={{ scene: ElectricalVRRoomScene }}
+        onExitViro={() => router.push("/(tabs)/arview")}
+        style={styles.flex}
+      />
+      <TouchableOpacity style={styles.exit} onPress={() => router.back()}>
+        <Text style={styles.exitText}>Exit</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    width: "100%",
-    gap: 10,
-  },
-  trackArea: {
-    height: THUMB_SIZE,
-    justifyContent: "center",
-  },
-  trackBg: {
+  container: { flex: 1, backgroundColor: "#000" },
+  flex: { flex: 1 },
+  exit: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    height: TRACK_HEIGHT,
-    borderRadius: TRACK_HEIGHT / 2,
-    backgroundColor: "#D9ECFF",
+    top: 50,
+    left: 20,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
   },
-  trackFill: {
-    position: "absolute",
-    left: 0,
-    height: TRACK_HEIGHT,
-    borderRadius: TRACK_HEIGHT / 2,
-    backgroundColor: "#1E90FF",
-  },
-  thumb: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: THUMB_SIZE / 2,
-    backgroundColor: "#0749FF",
-    borderWidth: 3,
-    borderColor: "#fff",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-  labels: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  label: {
-    fontSize: 13,
-    fontFamily: fontFamily.medium,
-    color: "#333",
-  },
+  exitText: { color: "#fff", fontSize: 14, fontWeight: "600" },
 });
 </file>
 
-<file path="constants/procedures-content.ts">
-// Content for Module 03: Procedures, Maintenance & Troubleshooting (merged).
-// Verified against the same sources as the other modules (NEST360 Biomedical
-// Engineer Education Module and corroborating clinical/manufacturer refs).
-// Generic radiant-warmer baseline; a specific model's service manual overrides.
+<file path="components/electrical-vr-room-scene.tsx">
+import {
+  Viro360Image,
+  Viro3DObject,
+  ViroAmbientLight,
+  ViroNode,
+  ViroQuad,
+  ViroScene,
+  ViroSpotLight,
+  ViroText,
+} from "@reactvision/react-viro";
+import React, { useState } from "react";
 
-export interface MaintenanceItem {
-  text: string;
+// Degrees the model turns per click.
+const STEP = 30;
+
+/**
+ * Gaze-controlled VR room scene for Google Cardboard / Shinecon (Android GVR).
+ *
+ * Interaction model: the user looks at a floating arrow (gaze) and presses the
+ * Bluetooth remote, which Android delivers as a mouse click and Viro surfaces
+ * as onClick — the same path as the Cardboard trigger. Each arrow rotates the
+ * warmer about an axis. A small center reticle shows the gaze point.
+ *
+ * Why gaze + click and not direct remote-to-rotation: the remote only emits
+ * BTN_MOUSE (a click), no directional/movement events, so direction comes from
+ * where the user looks, and the click commits the rotation.
+ */
+
+type Axis = "x" | "y";
+
+function ArrowTarget({
+  label,
+  position,
+  onPress,
+}: {
+  label: string;
+  position: [number, number, number];
+  onPress: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <ViroNode position={position}>
+      {/* Invisible-ish backing quad gives a comfortable gaze/click area */}
+      <ViroQuad
+        height={0.5}
+        width={0.5}
+        materials={hovered ? ["arrowActive"] : ["arrowIdle"]}
+        onHover={(isHovering: boolean) => setHovered(isHovering)}
+        onClick={() => onPress()}
+      />
+      <ViroText
+        text={label}
+        position={[0, 0, 0.01]}
+        scale={[0.5, 0.5, 0.5]}
+        style={{
+          fontSize: 36,
+          color: hovered ? "#FFD60A" : "#FFFFFF",
+          fontWeight: "bold",
+          textAlign: "center",
+        }}
+        outerStroke={{ type: "Outline", width: 2, color: "#000000" }}
+      />
+    </ViroNode>
+  );
 }
 
-export interface MaintenanceGroup {
-  heading: string;
-  tag: string; // EVERY USE, WEEKLY, ...
-  items: MaintenanceItem[];
+export default function ElectricalVRRoomScene() {
+  const [rotX, setRotX] = useState(0);
+  const [rotY, setRotY] = useState(0);
+
+  const rotate = (axis: Axis, dir: number) => {
+    if (axis === "x") setRotX((r) => r + dir * STEP);
+    else setRotY((r) => r + dir * STEP);
+  };
+
+  return (
+    <ViroScene>
+      <Viro360Image source={require("@/assets/models/hospital_room.jpg")} />
+      <ViroAmbientLight color="#FFFFFF" intensity={500} />
+      <ViroSpotLight
+        position={[0, 5, 0]}
+        direction={[0, -1, 0]}
+        color="#ffffff"
+        intensity={800}
+      />
+
+      {/* Warmer model, rotated by gaze+click */}
+      <ViroNode position={[0, -0.5, -2]} rotation={[rotX, rotY, 0]}>
+        <Viro3DObject
+          source={require("@/assets/models/3D/noosi_circuit.glb")}
+          type="GLB"
+          scale={[0.2, 0.2, 0.2]}
+          position={[0, -0.9, 0.9]}
+          onError={(e: any) => console.error("VR model error:", e)}
+        />
+      </ViroNode>
+
+      {/* Arrow controls around the model */}
+
+      {/* Center gaze reticle: a small dot fixed in front of the camera */}
+      <ViroNode position={[0, 0, -1]}>
+        <ViroQuad height={0.015} width={0.015} materials={["reticle"]} />
+      </ViroNode>
+    </ViroScene>
+  );
+}
+</file>
+
+<file path="constants/assessment-content.ts">
+// Content for Module 04: Assessment (Knowledge Check).
+// Questions are drawn from Modules 01-03 (orientation, components & logic,
+// procedures & maintenance). Mixed formats: multiple choice, true/false,
+// and symptom-to-cause matching.
+
+export type QuestionType = "mcq" | "tf" | "match";
+
+export interface AssessmentQuestion {
+  id: string;
+  type: QuestionType;
+  /** Shown only for "match" questions, e.g. the observed symptom */
+  symptom?: string;
+  prompt: string;
+  options: string[];
+  /** Index into options */
+  correctIndex: number;
+  /** Short explanation shown in the results review */
+  explanation: string;
 }
 
-export interface FaultBlock {
-  symptom: string;
-  causes: string[];
-}
-
-export const PROCEDURES = {
-  moduleLabel: "MODULE 03 OF 06",
-  number: "3",
-  title: "PROCEDURES & MAINTENANCES",
+export const ASSESSMENT = {
+  number: "4",
+  title: "ASSESSMENT",
   intro:
-    "Pre-use checks and preventive maintenance, organized by interval, followed by symptom-to-cause troubleshooting. Work through the checks in order, then use the fault guide to reason from what you observe.",
-
-  calloutLabel: "TEST vs CALIBRATE",
-  calloutBody:
-    "Heating elements are tested with a digital multimeter for voltage and continuity, not calibrated. Temperature sensing must be calibrated to the manufacturer's schedule.",
-
-  maintenanceNumber: "3.1",
-  maintenanceHeading: "MAINTENANCE BY INTERVAL",
-  groups: [
+    "A knowledge check covering orientation, components and logic, and procedures. Answer every question, then submit to see your score. You can retake the assessment as many times as you like.",
+  passMark: 70, // percent
+  questions: [
     {
-      heading: "Pre-use checks",
-      tag: "EVERY USE",
-      items: [
-        {
-          text: "Visually inspect the unit, probe lead, and power cord for damage or wear.",
-        },
-        {
-          text: "Confirm the skin probe reads a plausible temperature and is undamaged.",
-        },
-        {
-          text: "Test audible and visual alarms (e.g. trigger a probe-disconnect alarm).",
-        },
-        { text: "Verify mains power and, if fitted, battery backup." },
-        {
-          text: "Check bassinet brakes lock and the platform tilts and holds.",
-        },
+      id: "q1",
+      type: "mcq",
+      prompt:
+        "What is the primary clinical purpose of a neonatal radiant warmer?",
+      options: [
+        "To enclose the infant in a humid microenvironment",
+        "To prevent newborn hypothermia while keeping the infant accessible",
+        "To provide respiratory support during resuscitation",
+        "To sterilize the delivery-room environment",
       ],
+      correctIndex: 1,
+      explanation:
+        "The warmer delivers radiant heat from above to prevent hypothermia while leaving the infant fully exposed for observation and hands-on care.",
     },
     {
-      heading: "Weekly",
-      tag: "WEEKLY",
-      items: [
-        {
-          text: "Test the heating element with a digital multimeter for voltage and continuity.",
-        },
-        { text: "Inspect and function-test the skin temperature probe." },
-      ],
+      id: "q2",
+      type: "tf",
+      prompt:
+        "A closed incubator is the better choice when staff need to reach the infant quickly and often.",
+      options: ["True", "False"],
+      correctIndex: 1,
+      explanation:
+        "False. The radiant warmer trades enclosure for open access; the incubator excels at stable long-term thermoregulation, not rapid access.",
     },
     {
-      heading: "Monthly",
-      tag: "MONTHLY",
-      items: [
-        {
-          text: "Test the power-loss alarm by disconnecting mains with the unit running.",
-        },
-        { text: "Run the built-in self-diagnosis routine and log any codes." },
+      id: "q3",
+      type: "mcq",
+      prompt:
+        "In servo mode, what does the controller use to adjust heater output?",
+      options: [
+        "A fixed timer set by the operator",
+        "The ambient room temperature",
+        "Readings from the skin temperature probe",
+        "The heater element's internal resistance",
       ],
+      correctIndex: 2,
+      explanation:
+        "Servo mode is a closed loop: the skin probe feeds the infant's temperature to the controller, which auto-adjusts heater power.",
     },
     {
-      heading: "Quarterly",
-      tag: "QUARTERLY",
-      items: [
-        {
-          text: "Perform functional checks across all modes (servo and manual).",
-        },
-        {
-          text: "Complete electrical safety testing (earth continuity, leakage current).",
-        },
-      ],
+      id: "q4",
+      type: "tf",
+      prompt:
+        "The over-temperature cutout is part of the main control loop and depends on the control unit to function.",
+      options: ["True", "False"],
+      correctIndex: 1,
+      explanation:
+        "False. It is an independent hardware cutout outside the control loop, so it can cut heater power even if the control unit itself fails.",
     },
     {
-      heading: "Annual",
-      tag: "ANNUAL",
-      items: [
-        { text: "Full inspection per the manufacturer's service manual." },
-        {
-          text: "Calibrate temperature sensing to the manufacturer's schedule.",
-        },
-        {
-          text: "Confirm critical spares (probe, fuses, heating element) are on hand.",
-        },
+      id: "q5",
+      type: "mcq",
+      prompt: "Which of these is a correct pre-use (every use) check?",
+      options: [
+        "Calibrate the temperature sensors",
+        "Test audible and visual alarms, e.g. trigger a probe-disconnect alarm",
+        "Test the heating element with a multimeter",
+        "Complete electrical safety leakage testing",
       ],
+      correctIndex: 1,
+      explanation:
+        "Alarm testing is done before every use. Multimeter element tests are weekly, electrical safety tests quarterly, and calibration follows the manufacturer's schedule.",
     },
-  ] as MaintenanceGroup[],
-
-  safetyLabel: "SAFETY RULE",
-  safetyBody:
-    "Remove the unit from service on any alarm or control failure you cannot resolve. Stop immediately at any sign of smoke or a burning smell, do not continue use under any circumstances.",
-
-  troubleshootingNumber: "3.2",
-  troubleshootingHeading: "FAULTS & TROUBLESHOOTING",
-  troubleshootingIntro:
-    "Troubleshooting is symptom-to-cause reasoning. Start from what you observe, then work through the likely causes.",
-  faults: [
     {
+      id: "q6",
+      type: "mcq",
+      prompt:
+        "How is the heating element checked, per the maintenance guidance?",
+      options: [
+        "It is calibrated against a reference thermometer",
+        "It is tested with a digital multimeter for voltage and continuity",
+        "It is visually inspected only",
+        "It is swapped annually regardless of condition",
+      ],
+      correctIndex: 1,
+      explanation:
+        "Heating elements are tested (multimeter, voltage and continuity), not calibrated. Temperature sensing is what gets calibrated.",
+    },
+    {
+      id: "q7",
+      type: "match",
       symptom: "No heat from the element",
-      causes: [
-        "Faulty heating element",
-        "Faulty control PCB",
-        "Broken or loose wiring",
+      prompt: "Which of these is a likely cause of this symptom?",
+      options: [
+        "Poor probe skin contact",
         "Blown fuse on the heater circuit",
-      ],
-    },
-    {
-      symptom: "Probe alarm or erratic skin temperature",
-      causes: [
-        "Probe disconnected or loose at the unit",
-        "Damaged probe or lead",
-        "Poor skin contact, probe detached from the infant",
-      ],
-    },
-    {
-      symptom: "Unit will not power on / battery fault",
-      causes: [
-        "No mains supply or tripped outlet",
-        "Blown mains fuse",
-        "Failing battery or power-supply board",
-      ],
-    },
-    {
-      symptom: "Blank or faulty display",
-      causes: [
-        "Display module failure",
         "Loose display ribbon connector",
-        "Control PCB fault",
+        "Bassinet brakes not locked",
       ],
+      correctIndex: 1,
+      explanation:
+        "No heat points to the heater path: faulty element, control PCB, broken wiring, or a blown heater-circuit fuse.",
     },
     {
-      symptom: "Unit overheats / over-temp alarm",
-      causes: [
-        "Control unit driving full output incorrectly",
+      id: "q8",
+      type: "match",
+      symptom: "Probe alarm or erratic skin temperature",
+      prompt: "Which of these is a likely cause of this symptom?",
+      options: [
         "Stuck heater relay",
-        "Setpoint or mode misconfigured, verify the over-temp cutout engages",
+        "Blown mains fuse",
+        "Probe detached from the infant or poor skin contact",
+        "Display module failure",
       ],
+      correctIndex: 2,
+      explanation:
+        "Probe alarms trace to the probe path: disconnected or loose probe, damaged lead, or poor skin contact.",
     },
-  ] as FaultBlock[],
+    {
+      id: "q9",
+      type: "match",
+      symptom: "Unit overheats / over-temp alarm",
+      prompt: "Which of these is a likely cause of this symptom?",
+      options: [
+        "Control unit driving full output incorrectly",
+        "Failing battery",
+        "Damaged probe lead",
+        "Tripped wall outlet",
+      ],
+      correctIndex: 0,
+      explanation:
+        "Overheating suggests the control unit driving full output, a stuck heater relay, or a misconfigured setpoint/mode. Verify the over-temp cutout engages.",
+    },
+    {
+      id: "q10",
+      type: "tf",
+      prompt:
+        "If a warmer shows smoke or a burning smell, it may remain in service while a technician is called, as long as it is supervised.",
+      options: ["True", "False"],
+      correctIndex: 1,
+      explanation:
+        "False. Stop immediately at any sign of smoke or a burning smell and remove the unit from service. Do not continue use under any circumstances.",
+    },
+  ] as AssessmentQuestion[],
 };
 </file>
 
-<file path="hooks/use-live-parameters.ts">
-import { PARAMETERS_TABLE, supabase } from "@/lib/supabase";
-import { useEffect, useRef, useState } from "react";
+<file path="constants/warmer-elements.ts">
+// Element-level manifest for the new, higher-fidelity part set (separate
+// .obj/.mtl per physical component, exported from Fusion/Inventor via
+// Autodesk ATF). This is a finer-grained sibling to constants/warmer-parts.ts
+// -- that file drives the 5-module explode view on the OLD single-scan
+// model; this one drives per-element focus/explode on the NEW part set.
+//
+// COORDINATE SYSTEM (measured directly from the .obj files, source units = cm):
+//   - Height is +Z (taller = higher Z). This is the OPPOSITE of the old scan
+//     model, which was Z-up-NEGATIVE. Don't reuse old sign conventions.
+//   - Front (caregiver-facing side) is -X, confirmed by Abdul and consistent
+//     with Control_Board sitting at the most-negative X of any part.
+//   - Side/depth is Y.
+//   - Scale: these files are in cm, Viro works in meters, so apply a uniform
+//     0.01 scale on the wrapper node. Do NOT reuse the old model's 0.05
+//     scale constant -- that was calibrated for a different source model.
+//   - Axis-up fix: Abdul found a 90 degree rotation on X is needed in
+//     Blender to align these (CAD Z-up -> Viro/AR Y-up). Sign not yet
+//     confirmed for Viro (old model used [-90,0,0]) -- apply once on a
+//     single wrapper ViroNode around ALL elements, test in AR, flip if the
+//     assembly renders upside down or on its side.
+//
+// ASSEMBLY FRAME:
+//   Five of six parts were exported "in place" and share one coordinate
+//   frame -- load them all at restPosition [0,0,0] and they reassemble
+//   correctly, same trick the old MODULE_SOURCES setup used for the GLBs.
+//   bed_bassinet is the one exception: it was exported at its own local
+//   origin (bbox starts at [0,0,0] instead of sharing the ~z:97-172 frame
+//   the rest of the bassinet/heater assembly sits in). restPosition below
+//   is a COMPUTED offset (aligning its footprint to bassinet_shields' inner
+//   corner), not a measured one -- confirm visually once this loads.
+//
+// STILL MISSING: support_frame.obj (only the .mtl was sent). This is very
+// likely the main vertical column connecting wheels -> the rest of the
+// stack; collimator_support (thin, 75cm tall, spans z:97.5-172.5) looks
+// like a separate mounting rail for the heater head, not the main column.
+// Treat support_frame as part of the "stand" module once it arrives.
+//
+// PERFORMANCE WARNING: wheels.obj (89,664 verts / 179,360 tris) and
+// collimator_support.obj (65,944 verts / 131,888 tris) are raw CAD
+// tessellation -- ~300k triangles between just these two parts. Decimate
+// in Blender (or re-export at coarser tessellation) before shipping in the
+// AR app; this will hurt load time and frame rate on-device as-is.
 
-export interface ParameterRow {
-  device_timestamp: string | number | null;
-  core_temp: number | null;
-  ambient_temp: number | null;
-  humidity: number | null;
-  set_target: number | null;
-  heater_power: number | null;
-  fault_status: string | boolean | null;
-  init_phase: boolean | null;
+export type Vec3 = [number, number, number];
+
+export type ElementId =
+  | "wheels"
+  | "support_frame" // pending -- file not yet provided
+  | "real_bed_bassinet"
+  | "bassinet_shields"
+  | "control_board"
+  | "collimator_support"
+  | "collimator_dissemble";
+
+export type ElementModuleId = "stand" | "bassinet" | "controller" | "heater";
+
+export interface WarmerElement {
+  id: ElementId;
+  label: string;
+  module: ElementModuleId;
+  /** Filenames only -- place alongside their .mtl in assets/models/ */
+  glbFile: string;
+  materials: string[];
+  /** Named sub-meshes/groups inside this OBJ -- useful for finer hotspots later */
+  groups: string[];
+  vertexCount: number;
+  faceCount: number;
+  bbox: { min: Vec3; max: Vec3 };
+  /** bbox center, in this element's own file-local coordinates */
+  centroid: Vec3;
+  /**
+   * Offset to apply so this element sits correctly in the shared assembly
+   * frame. [0,0,0] for elements exported in place. Non-zero currently only
+   * for bed_bassinet (see ASSEMBLY FRAME note above).
+   */
+  restPosition: Vec3;
+  /**
+   * Removal-path offset applied ON TOP of restPosition when exploded.
+   * FIRST-PASS DIRECTIONAL GUESSES based on -X=front, +Z=up, Y=side --
+   * not yet confirmed in AR/Blender. Magnitudes are rough (cm, pre-0.01
+   * scale) sized off each part's own bbox. Tune visually once loaded.
+   */
+  explodeOffset: Vec3 | null;
+  explodeDelay: number;
+  notes?: string;
 }
 
-export type ConnectionState = "connecting" | "live" | "offline";
+export const WARMER_ELEMENTS: Record<ElementId, WarmerElement> = {
+  wheels: {
+    id: "wheels",
+    label: "Casters & Base",
+    module: "stand",
+    glbFile: "Wheels.glb",
+    materials: ["Steel_-_Satin"],
+    groups: [], // ~76 CAD "Body" sub-parts (individual bolts/washers/etc.) -- too granular to list here
+    vertexCount: 89664,
+    faceCount: 179360,
+    bbox: { min: [-63.302, -6.696, -11.525], max: [3.302, 52.6335, 5.9375] },
+    centroid: [-30.0, 22.9688, -2.7938],
+    restPosition: [0, 0, 0],
+    explodeOffset: [0, -15, 0], // fixed anchor of the assembly, like "stand" in the old model
+    explodeDelay: 300,
+    notes: "HIGH POLY -- decimate before use in AR (see file header).",
+  },
 
-// Poll fallback interval (ms) used if realtime isn't available.
-const POLL_MS = 5000;
+  support_frame: {
+    id: "support_frame",
+    label: "Support Frame / Column",
+    module: "stand",
+    glbFile: "support_frame.glb",
+    materials: [
+      "Aluminum_-_Anodized_Glossy_(Grey)",
+      "Steel_-_Satin",
+      "Aluminum_-_Anodized_Rough_(Grey)",
+    ],
+    groups: [],
+    vertexCount: 0,
+    faceCount: 0,
+    bbox: { min: [0, 0, 0], max: [0, 0, 0] },
+    centroid: [0, 0, 0],
+    restPosition: [0, 0, 0],
+    explodeOffset: [0, -10, 0], // likely near-anchor like wheels, revisit once geometry is known
+    explodeDelay: 400,
+    notes:
+      "Waiting on Support_Frame.obj. Recompute bbox/centroid/restPosition once received.",
+  },
 
-async function fetchLatest(): Promise<ParameterRow | null> {
-  const { data, error } = await supabase
-    .from(PARAMETERS_TABLE)
-    .select("*")
-    .order("device_timestamp", { ascending: false })
-    .limit(1);
+  real_bed_bassinet: {
+    id: "real_bed_bassinet",
+    label: "Mattress Platform",
+    module: "bassinet",
+    glbFile: "Real_Bed_Bassinet.glb",
+    materials: ["Acrylic_(Clear)", "Fabric_(White)"],
+    groups: ["Body1", "Body2"],
+    vertexCount: 144,
+    faceCount: 284,
+    bbox: { min: [0, 0, 0], max: [58, 40, 6] },
+    centroid: [29.0, 20.0, 3.0],
+    // COMPUTED, not measured -- nests the mattress footprint inside
+    // bassinet_shields' inner-corner. Confirm visually.
+    restPosition: [0, 0, 0],
+    explodeOffset: [0, 40, 0], // slides toward the front (-X) with the shields
+    explodeDelay: 400,
+    notes:
+      "See ASSEMBLY FRAME note -- offset is inferred from bbox matching, not exported position.",
+  },
 
-  if (error) {
-    console.error("Supabase fetch error:", error.message);
-    return null;
-  }
-  return (data?.[0] as ParameterRow) ?? null;
-}
+  bassinet_shields: {
+    id: "bassinet_shields",
+    label: "Bassinet Side Shields",
+    module: "bassinet",
+    glbFile: "Bassinet_Shields.glb",
+    materials: ["Acrylic_(Clear)"],
+    groups: [
+      "bassinet shield back",
+      "bassinet shield front",
+      "bassinet shield left",
+      "bassinet shield right",
+      "bassinet base",
+    ],
+    vertexCount: 262,
+    faceCount: 504,
+    bbox: {
+      min: [-60.1433, -0.0647, 97.8863],
+      max: [0.3269, 46.1557, 128.3566],
+    },
+    centroid: [-29.9082, 23.0455, 113.1214],
+    restPosition: [0, 0, 0],
+    explodeOffset: [0, 0, 0], // slides toward the front (-X), same direction as the mattress
+    explodeDelay: 400,
+    notes:
+      "Named groups (back/front/left/right/base) are ready-made hotspot targets if you want per-panel focus later.",
+  },
 
-/**
- * Subscribes to the latest device parameters.
- *
- * Strategy: fetch the latest row immediately on mount so the UI has data, then
- * open a realtime channel for INSERT/UPDATE pushes. If realtime never reaches
- * SUBSCRIBED (table not enabled for realtime, network), fall back to polling.
- */
-export function useLiveParameters() {
-  const [row, setRow] = useState<ParameterRow | null>(null);
-  const [status, setStatus] = useState<ConnectionState>("connecting");
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  control_board: {
+    id: "control_board",
+    label: "Control Panel",
+    module: "controller",
+    glbFile: "Control_Board.glb",
+    materials: [
+      "Plastic_-_Textured_-_Regular",
+      "Display_-_4x20_-_LCD_(White_on_Blue)",
+      "LED_(Red)",
+      "LED_(Green)",
+      "LED_(Blue)",
+    ],
+    groups: ["control board", "Body23", "Body25", "Body26", "Body27"],
+    vertexCount: 418,
+    faceCount: 816,
+    bbox: { min: [-37.5, -6.0647, 102.5], max: [-22.5, -0.0647, 112.5] },
+    centroid: [-30.0, -3.0647, 107.5],
+    restPosition: [0, 0, 0],
+    explodeOffset: [0, 0, 20], // pulls out along Y, its thin/mount axis
+    explodeDelay: 200,
+    notes:
+      "Individually-colored LED materials (Red/Green/Blue) -- could drive real-time alarm-state visuals later, tying into the live Supabase parameters.",
+  },
 
-  useEffect(() => {
-    let mounted = true;
+  collimator_support: {
+    id: "collimator_support",
+    label: "Heater Mounting Rail",
+    module: "heater",
+    glbFile: "Collimator_support.glb    ",
+    materials: ["Steel_-_Satin"],
+    groups: ["r right vertical (4)", "r right vertical (4) (1)"],
+    vertexCount: 65944,
+    faceCount: 131888,
+    bbox: {
+      min: [-41.0131, 22.5456, 97.4966],
+      max: [0.9668, 24.5454, 172.4964],
+    },
+    centroid: [-20.0231, 23.5455, 134.9965],
+    restPosition: [0, 0, 0],
+    explodeOffset: [0, 32, 0], // lifts up (+Z) with the heater head
+    explodeDelay: 400,
+    notes:
+      "HIGH POLY -- decimate before use in AR (see file header). Very thin in Y (2 units) -- likely the rail the heater head slides on, not the main column.",
+  },
 
-    const startPolling = () => {
-      if (pollRef.current) return;
-      pollRef.current = setInterval(async () => {
-        const latest = await fetchLatest();
-        if (mounted && latest) setRow(latest);
-      }, POLL_MS);
-    };
+  collimator_dissemble: {
+    id: "collimator_dissemble",
+    label: "Radiant Heater Head",
+    module: "heater",
+    glbFile: "Collimator_dissemble.glb",
+    materials: ["ABS_(White)"],
+    groups: ["Body1"],
+    vertexCount: 179,
+    faceCount: 354,
+    bbox: { min: [-47.0, 14.7043, 161.0], max: [-2.0, 30.2957, 170.9536] },
+    centroid: [-24.5, 22.5, 165.9768],
+    restPosition: [0, 0, 0],
+    explodeOffset: [0, 30, 0], // lifts up (+Z), further than the rail beneath it
+    explodeDelay: 600,
+    notes: "Topmost element in the assembly (highest z-range of any part).",
+  },
+};
 
-    const stopPolling = () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
+export const ELEMENT_ORDER: ElementId[] = [
+  "wheels",
+  "support_frame",
+  "real_bed_bassinet",
+  "bassinet_shields",
+  "control_board",
+  "collimator_support",
+  "collimator_dissemble",
+];
 
-    fetchLatest().then((latest) => {
-      if (!mounted) return;
-      console.log("[INITIAL] latest row:", JSON.stringify(latest, null, 2));
-      if (latest) setRow(latest);
-    });
-
-    const channel = supabase
-      .channel("parameters-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: PARAMETERS_TABLE },
-        (payload) => {
-          if (!mounted) return;
-          console.log(
-            "[REALTIME] new row:",
-            JSON.stringify(payload.new, null, 2)
-          );
-          const next = payload.new as ParameterRow;
-          if (next) setRow(next);
-        }
-      )
-      .subscribe((channelStatus) => {
-        console.log("[REALTIME] channel status:", channelStatus);
-        if (!mounted) return;
-        if (channelStatus === "SUBSCRIBED") {
-          setStatus("live");
-          stopPolling();
-        } else if (
-          channelStatus === "CHANNEL_ERROR" ||
-          channelStatus === "TIMED_OUT" ||
-          channelStatus === "CLOSED"
-        ) {
-          setStatus("offline");
-          startPolling();
-        }
-      });
-
-    return () => {
-      mounted = false;
-      stopPolling();
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  return { row, status };
-}
-</file>
-
-<file path="lib/parameter-state.ts">
-// Derives the human "state" label each card shows, from a value and a safe
-// range. Thresholds reflect the copy already in the cards (core 36.5-36.7,
-// humidity 30-50). Adjust to match your clinical thresholds.
-
-export type Band = "normal" | "low" | "high";
-
-export function bandFor(value: number | null, min: number, max: number): Band {
-  if (value == null || Number.isNaN(value)) return "normal";
-  if (value < min) return "low";
-  if (value > max) return "high";
-  return "normal";
-}
-
-export const CORE_RANGE = { min: 34.5, max: 36.7 };
-export const AMBIENT_RANGE = { min: 22, max: 26 };
-export const HUMIDITY_RANGE = { min: 50, max: 80 };
-
-// Format a possibly-null number to a fixed value, with a 0 fallback.
-export function fmt(value: number | null, digits = 1): number {
-  if (value == null || Number.isNaN(value)) return 0;
-  return Number(value.toFixed(digits));
-}
-</file>
-
-<file path="lib/supabase.ts">
-import { createClient } from "@supabase/supabase-js";
-
-// NOTE: the anon key is a public client key (safe to ship in an app), but for
-// cleanliness move these into app config / env (e.g. expo-constants extra)
-// rather than hardcoding long-term.
-const SUPABASE_URL = "https://nxpurdeeleevjqtlzymm.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54cHVyZGVlbGVldmpxdGx6eW1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3ODI5MTMsImV4cCI6MjA5NzM1ODkxM30.8UREPVHgqMQycjDAPAeH9GFkjw-uKMgN-SXtG14PpXU";
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: false },
-});
-
-export const PARAMETERS_TABLE = "Parameters";
+export const MODULE_ELEMENTS: Record<ElementModuleId, ElementId[]> = {
+  heater: ["collimator_dissemble", "collimator_support"],
+  bassinet: ["bassinet_shields", "real_bed_bassinet"],
+  controller: ["control_board"],
+  stand: ["support_frame", "wheels"],
+};
 </file>
 
 <file path="app/training/components.tsx">
@@ -1447,15 +1731,6 @@ const styles = StyleSheet.create({
 });
 </file>
 
-<file path="app/training/faults.tsx">
-import React from "react";
-import { Text } from "react-native";
-
-export default function Faults() {
-  return <Text>Faults</Text>;
-}
-</file>
-
 <file path="app/training/orientation.tsx">
 import { fontFamily } from "@/constants/fontFamily";
 import { ORIENTATION } from "@/constants/training-content";
@@ -1667,62 +1942,348 @@ const styles = StyleSheet.create({
 });
 </file>
 
-<file path="app/mobilevr.tsx">
-import VRRoomScene from "@/components/vr-room-scene";
-import { ViroMaterials, ViroVRSceneNavigator } from "@reactvision/react-viro";
-import { router } from "expo-router";
-import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+<file path="app/training/procedures.tsx">
+import { fontFamily } from "@/constants/fontFamily";
+import { PROCEDURES } from "@/constants/procedures-content";
+import { useRouter } from "expo-router";
+import { ArrowLeft, ArrowRight, TickCircle } from "iconsax-react-nativejs";
+import React, { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-// Register materials once at module load. Guard so fast-refresh re-runs don't
-// throw on duplicate registration.
-try {
-  ViroMaterials.createMaterials({
-    arrowIdle: { diffuseColor: "rgba(255,255,255,0.18)" },
-    arrowActive: { diffuseColor: "rgba(7,73,255,0.55)" },
-    reticle: { diffuseColor: "rgba(255,255,255,0.9)" },
-  });
-} catch {
-  // already registered
-}
-
-/**
- * Mobile VR screen for Google Cardboard / Shinecon on Android (GVR).
- *
- * Stereo via ViroVRSceneNavigator + vrModeEnabled. Rotation of the model is
- * handled inside the scene via gaze + remote click (see vr-room-scene).
- * onExitViro navigates away so the view isn't left blank after exit.
- */
-export default function MobileVRScreen() {
+function MaintenanceRow({ text }: { text: string }) {
   return (
-    <View style={styles.container}>
-      <ViroVRSceneNavigator
-        vrModeEnabled={true}
-        pbrEnabled
-        initialScene={{ scene: VRRoomScene }}
-        onExitViro={() => router.back()}
-        style={styles.flex}
-      />
-      <TouchableOpacity style={styles.exit} onPress={() => router.back()}>
-        <Text style={styles.exitText}>Exit</Text>
-      </TouchableOpacity>
+    <View style={styles.itemRow}>
+      <TickCircle size={20} color="#0AC084" variant="Bold" />
+      <Text style={styles.itemText}>{text}</Text>
     </View>
   );
 }
 
+export default function Procedures() {
+  const router = useRouter();
+  const [completed, setCompleted] = useState(false);
+
+  return (
+    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.pageTitle}>
+          {PROCEDURES.number}. {PROCEDURES.title}
+        </Text>
+        <Text style={styles.intro}>{PROCEDURES.intro}</Text>
+
+        <View style={styles.callout}>
+          <Text style={styles.calloutLabel}>{PROCEDURES.calloutLabel}</Text>
+          <Text style={styles.calloutBody}>{PROCEDURES.calloutBody}</Text>
+        </View>
+
+        <Text style={styles.sectionHeading}>
+          {PROCEDURES.maintenanceNumber} {PROCEDURES.maintenanceHeading}
+        </Text>
+
+        {PROCEDURES.groups.map((group) => (
+          <View key={group.heading} style={styles.group}>
+            <View style={styles.groupHeadRow}>
+              <Text style={styles.groupHeading}>{group.heading}</Text>
+            </View>
+            <View style={styles.itemsCard}>
+              {group.items.map((item) => (
+                <MaintenanceRow key={item.text} text={item.text} />
+              ))}
+            </View>
+          </View>
+        ))}
+
+        <View style={styles.safetyCallout}>
+          <Text style={styles.safetyLabel}>{PROCEDURES.safetyLabel}</Text>
+          <Text style={styles.safetyBody}>{PROCEDURES.safetyBody}</Text>
+        </View>
+
+        <Text style={styles.sectionHeading}>
+          {PROCEDURES.troubleshootingNumber} {PROCEDURES.troubleshootingHeading}
+        </Text>
+        <Text style={styles.body}>{PROCEDURES.troubleshootingIntro}</Text>
+
+        {PROCEDURES.faults.map((fault) => (
+          <View key={fault.symptom} style={styles.faultCard}>
+            <Text style={styles.faultSymptom}>{fault.symptom}</Text>
+            <Text style={styles.faultCausesLabel}>POSSIBLE CAUSES</Text>
+            {fault.causes.map((cause) => (
+              <View key={cause} style={styles.causeRow}>
+                <Text style={styles.causeDot}>•</Text>
+                <Text style={styles.causeText}>{cause}</Text>
+              </View>
+            ))}
+          </View>
+        ))}
+
+        <Pressable
+          onPress={() => setCompleted((c) => !c)}
+          android_ripple={{ color: "#E2E2E8" }}
+          style={({ pressed }) => [
+            styles.completeBtn,
+            completed && styles.completeBtnActive,
+            pressed && styles.completeBtnPressed,
+          ]}
+        >
+          <Text
+            style={[
+              styles.completeBtnText,
+              completed && styles.completeBtnTextActive,
+            ]}
+          >
+            {completed ? "MODULE COMPLETE" : "MARK MODULE COMPLETE"}
+          </Text>
+        </Pressable>
+
+        <View style={styles.navRow}>
+          <Pressable
+            onPress={() => router.push("/training/components" as any)}
+            android_ripple={{ color: "#E2E2E8" }}
+            style={({ pressed }) => [
+              styles.navBtnGhost,
+              pressed && styles.navBtnPressed,
+            ]}
+          >
+            <ArrowLeft size={16} color="#1A1A1A" variant="Linear" />
+            <Text style={styles.navBtnGhostText}>Components</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/training/faults" as any)}
+            android_ripple={{ color: "#2A5BFF" }}
+            style={({ pressed }) => [
+              styles.navBtnSolid,
+              pressed && styles.navBtnPressed,
+            ]}
+          >
+            <Text style={styles.navBtnSolidText}>Knowledge Check</Text>
+            <ArrowRight size={16} color="#FFFFFF" variant="Linear" />
+          </Pressable>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
-  flex: { flex: 1 },
-  exit: {
-    position: "absolute",
-    top: 50,
-    left: 20,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+  screen: { flex: 1, backgroundColor: "#F4F4F8" },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 28 },
+  moduleLabel: {
+    fontSize: 12,
+    fontFamily: fontFamily.bold,
+    color: "#0749FF",
+    letterSpacing: 1,
+    marginBottom: 8,
   },
-  exitText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  pageTitle: {
+    fontSize: 18,
+    fontFamily: fontFamily.bold,
+    color: "#1A1A1A",
+    letterSpacing: -0.5,
+    marginBottom: 14,
+  },
+  intro: {
+    fontSize: 14,
+    fontFamily: fontFamily.regular,
+    color: "#3D3D3D",
+    lineHeight: 23,
+    letterSpacing: -0.2,
+  },
+  callout: {
+    marginTop: 18,
+  },
+  calloutLabel: {
+    fontSize: 14,
+    fontFamily: fontFamily.bold,
+    color: "#1A1A1A",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  calloutBody: {
+    fontSize: 14,
+    fontFamily: fontFamily.regular,
+    color: "#3D3D3D",
+    lineHeight: 21,
+    letterSpacing: -0.2,
+  },
+  sectionHeading: {
+    marginTop: 32,
+    marginBottom: 24,
+    fontSize: 16,
+    fontFamily: fontFamily.bold,
+    color: "#1A1A1A",
+    letterSpacing: -0.3,
+  },
+  group: { marginBottom: 24 },
+  groupHeadRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    marginBottom: 12,
+  },
+  groupHeading: {
+    fontSize: 15,
+    fontFamily: fontFamily.bold,
+    color: "#1A1A1A",
+    letterSpacing: -0.2,
+    textTransform: "uppercase",
+  },
+  itemsCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 14,
+    gap: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  itemText: {
+    flex: 1,
+    fontSize: 13.5,
+    fontFamily: fontFamily.regular,
+    color: "#3D3D3D",
+    lineHeight: 20,
+    letterSpacing: -0.2,
+  },
+  safetyCallout: {},
+  safetyLabel: {
+    fontSize: 14,
+    fontFamily: fontFamily.bold,
+    color: "#C0392B",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  safetyBody: {
+    fontSize: 13.5,
+    fontFamily: fontFamily.regular,
+    color: "#9f1300ff",
+    lineHeight: 21,
+    letterSpacing: -0.2,
+  },
+  body: {
+    fontSize: 14,
+    fontFamily: fontFamily.regular,
+    color: "#3D3D3D",
+    lineHeight: 23,
+    letterSpacing: -0.2,
+    marginBottom: 8,
+  },
+  faultCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  faultSymptom: {
+    fontSize: 15,
+    fontFamily: fontFamily.bold,
+    color: "#1A1A1A",
+    letterSpacing: -0.2,
+    marginBottom: 12,
+  },
+  faultCausesLabel: {
+    fontSize: 11,
+    fontFamily: fontFamily.bold,
+    color: "#9A9AA0",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  causeRow: { flexDirection: "row", marginBottom: 4 },
+  causeDot: {
+    fontSize: 14,
+    color: "#0749FF",
+    width: 14,
+    lineHeight: 20,
+  },
+  causeText: {
+    flex: 1,
+    fontSize: 13.5,
+    fontFamily: fontFamily.regular,
+    color: "#3D3D3D",
+    lineHeight: 20,
+    letterSpacing: -0.2,
+  },
+  completeBtn: {
+    marginTop: 22,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#0749FF",
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  completeBtnActive: { backgroundColor: "#E8F0FF" },
+  completeBtnPressed: { transform: [{ scale: 0.99 }] },
+  completeBtnText: {
+    fontSize: 14,
+    fontFamily: fontFamily.semibold,
+    color: "#0749FF",
+    letterSpacing: 0.2,
+  },
+  completeBtnTextActive: { color: "#0749FF" },
+  navRow: { flexDirection: "row", gap: 12, marginTop: 12 },
+  navBtnGhost: {
+    flex: 1,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  navBtnGhostText: {
+    fontSize: 14,
+    fontFamily: fontFamily.semibold,
+    color: "#1A1A1A",
+    letterSpacing: -0.2,
+  },
+  navBtnSolid: {
+    flex: 1,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: "#1B2B3F",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  navBtnSolidText: {
+    fontSize: 13,
+    fontFamily: fontFamily.semibold,
+    color: "#FFFFFF",
+    letterSpacing: -0.2,
+  },
+  navBtnPressed: { transform: [{ scale: 0.99 }] },
 });
 </file>
 
@@ -1767,6 +2328,31 @@ const styles = StyleSheet.create({
 <path d="M90.4164 271.25H8.74976V189.583" stroke="white" stroke-width="8.75" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M189.585 8.74976H271.251V90.4164" stroke="white" stroke-width="8.75" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M189.585 271.25H271.251V189.583" stroke="white" stroke-width="8.75" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</file>
+
+<file path="assets/images/Power.svg">
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="0.285714" y="0.285714" width="31.4286" height="31.4286" rx="15.7143" fill="url(#paint0_linear_199_758)"/>
+<rect x="0.285714" y="0.285714" width="31.4286" height="31.4286" rx="15.7143" stroke="url(#paint1_linear_199_758)" stroke-width="0.571429"/>
+<g clip-path="url(#clip0_199_758)">
+<path d="M16 8V15.5" stroke="white" stroke-width="2.0625" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M20.8 11.4502C21.7425 12.393 22.3847 13.5938 22.6456 14.9012C22.9065 16.2085 22.7745 17.5638 22.2661 18.7962C21.7578 20.0286 20.8959 21.0829 19.7891 21.8261C18.6824 22.5692 17.3804 22.9681 16.0473 22.9723C14.7142 22.9764 13.4097 22.5858 12.2983 21.8495C11.1869 21.1133 10.3184 20.0644 9.80239 18.8352C9.28633 17.6061 9.1458 16.2516 9.39853 14.9427C9.65126 13.6337 10.2859 12.4289 11.2225 11.4802" stroke="white" stroke-width="2.0625" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_199_758" x1="16" y1="0" x2="16" y2="32" gradientUnits="userSpaceOnUse">
+<stop stop-color="#00B377"/>
+<stop offset="0.487782" stop-color="#009463"/>
+<stop offset="1" stop-color="#005237"/>
+</linearGradient>
+<linearGradient id="paint1_linear_199_758" x1="16" y1="-6.85714" x2="16" y2="32" gradientUnits="userSpaceOnUse">
+<stop stop-color="#04E59B"/>
+<stop offset="1" stop-color="#003D29"/>
+</linearGradient>
+<clipPath id="clip0_199_758">
+<rect width="18" height="18" fill="white" transform="translate(7 6.5)"/>
+</clipPath>
+</defs>
 </svg>
 </file>
 
@@ -1929,73 +2515,400 @@ export function HelloWave() {
 </file>
 
 <file path="components/interactive-warmer-scene.tsx">
+// import {
+//   MODULE_ORDER,
+//   ModuleId,
+//   SceneKey,
+//   Vec3,
+//   WARMER_MODULES,
+//   WARMER_SCENES,
+//   WarmerPart,
+// } from "@/constants/warmer-parts";
+// import {
+//   Viro360Image,
+//   Viro3DObject,
+//   ViroAmbientLight,
+//   ViroAnimations,
+//   ViroARScene,
+//   ViroMaterials,
+//   ViroNode,
+//   ViroPolyline,
+//   ViroSphere,
+//   ViroSpotLight,
+//   ViroText,
+// } from "@reactvision/react-viro";
+// import React from "react";
+
+// // The 5 module GLBs split from the original scan. Exported in place,
+// // so loading all of them at the same position reassembles the warmer.
+// const MODULE_SOURCES: Record<ModuleId, any> = {
+//   heater: require("@/assets/models/heater_module.glb"),
+//   bassinet: require("@/assets/models/bassinet_module.glb"),
+//   controller: require("@/assets/models/controller_module.glb"),
+//   tray: require("@/assets/models/tray_module.glb"),
+//   stand: require("@/assets/models/stand_module.glb"),
+// };
+
+// const DIMMED_OPACITY = 0.3; // non-focused modules in detail scenes
+
+// ViroMaterials.createMaterials({
+//   hotspot: { diffuseColor: "#00A651", lightingModel: "Constant" },
+//   hotspotSelected: { diffuseColor: "#FFD60A", lightingModel: "Constant" },
+//   guideLine: { diffuseColor: "#9BE7C4", lightingModel: "Constant" },
+// });
+
+// // Per-module explode/assemble animations. Registered once from the
+// // offsets in WARMER_MODULES so the data file stays the single source
+// // of truth for removal paths.
+// const animationDefs: Record<string, any> = {
+//   pulseUp: {
+//     properties: { scaleX: 1.3, scaleY: 1.3, scaleZ: 1.3 },
+//     duration: 600,
+//     easing: "EaseInEaseOut",
+//   },
+//   pulseDown: {
+//     properties: { scaleX: 1.0, scaleY: 1.0, scaleZ: 1.0 },
+//     duration: 600,
+//     easing: "EaseInEaseOut",
+//   },
+//   pulse: [["pulseUp", "pulseDown"]] as unknown as any,
+// };
+// MODULE_ORDER.forEach((id) => {
+//   const [ox, oy, oz] = WARMER_MODULES[id].explodeOffset;
+//   animationDefs[`explode_${id}`] = {
+//     properties: { positionX: ox, positionY: oy, positionZ: oz },
+//     duration: 700,
+//     easing: "EaseInEaseOut",
+//   };
+//   animationDefs[`assemble_${id}`] = {
+//     properties: { positionX: 0, positionY: 0, positionZ: 0 },
+//     duration: 700,
+//     easing: "EaseInEaseOut",
+//   };
+// });
+// ViroAnimations.registerAnimations(animationDefs);
+
+// const MAX_DELAY = Math.max(
+//   ...MODULE_ORDER.map((id) => WARMER_MODULES[id].explodeDelay)
+// );
+
+// // viroAppProps contract between the RN layer (app/vrscene.tsx) and this scene
+// export type WarmerSceneAppProps = {
+//   sceneKey: SceneKey;
+//   exploded: boolean;
+//   selectedPartId: string | null;
+//   onSelectPart: (part: WarmerPart) => void;
+//   onNavigate: (target: SceneKey) => void;
+// };
+
+// type ViroSceneProps = {
+//   sceneNavigator: { viroAppProps: WarmerSceneAppProps };
+// };
+
+// function addVec(a: Vec3, b: Vec3): Vec3 {
+//   return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+// }
+
+// function Hotspot({
+//   part,
+//   isSelected,
+//   onClick,
+// }: {
+//   part: WarmerPart;
+//   isSelected: boolean;
+//   onClick: () => void;
+// }) {
+//   return (
+//     <ViroNode position={part.position} onClick={onClick}>
+//       <ViroSphere
+//         radius={0.045}
+//         materials={[isSelected ? "hotspotSelected" : "hotspot"]}
+//         opacity={0.85}
+//         animation={{ name: "pulse", run: true, loop: true }}
+//       />
+//       <ViroText
+//         text={part.label}
+//         position={[0, 0.09, 0]}
+//         scale={[0.18, 0.18, 0.18]}
+//         style={{
+//           fontSize: 16,
+//           color: "#FFFFFF",
+//           fontWeight: "bold",
+//           textAlign: "center",
+//         }}
+//         outerStroke={{ type: "Outline", width: 2, color: "#000000" }}
+//         transformBehaviors={["billboard"]}
+//       />
+//     </ViroNode>
+//   );
+// }
+
+// export default function InteractiveWarmerScene(props: ViroSceneProps) {
+//   const { sceneKey, exploded, selectedPartId, onSelectPart, onNavigate } =
+//     props.sceneNavigator.viroAppProps;
+
+//   const scene = WARMER_SCENES[sceneKey] ?? WARMER_SCENES.overview;
+//   const isOverview = scene.key === "overview";
+
+//   const handleModuleClick = (moduleId: ModuleId) => {
+//     const mod = WARMER_MODULES[moduleId];
+//     if (mod.targetScene && mod.targetScene !== scene.key) {
+//       onNavigate(mod.targetScene);
+//       return;
+//     }
+//     onSelectPart({
+//       id: `module-${mod.id}`,
+//       label: mod.label,
+//       description: mod.description,
+//       position: [0, 0, 0],
+//     });
+//   };
+
+//   return (
+//     <ViroARScene>
+//       {/* 360 background */}
+//       <Viro360Image source={require("@/assets/models/hospital_room.jpg")} />
+
+//       {/* Lighting */}
+//       <ViroAmbientLight color="#FFFFFF" intensity={500} />
+//       <ViroSpotLight
+//         position={[0, 5, 0]}
+//         direction={[0, -1, 0]}
+//         color="#ffffff"
+//         intensity={800}
+//         castsShadow={true}
+//       />
+//       <ViroSpotLight
+//         position={[0, 0, 5]}
+//         direction={[0, 0, -1]}
+//         color="#ffffff"
+//         intensity={400}
+//       />
+
+//       <ViroNode
+//         position={scene.modelPosition}
+//         scale={scene.modelScale}
+//         rotation={scene.modelRotation}
+//       >
+//         {/* Same [0,-0.9,0] offset the single model used, so the existing
+//             per-scene framing presets still apply */}
+//         <ViroNode position={[0, -0.9, 0]}>
+//           {MODULE_ORDER.map((moduleId) => {
+//             const mod = WARMER_MODULES[moduleId];
+//             const isFocused =
+//               !scene.focusModule || scene.focusModule === moduleId;
+//             const isAnchor = mod.explodeOffset.every((v) => v === 0);
+
+//             // Explode delays run smallest-first (tray, controller,
+//             // bassinet, heater); assembling runs in reverse order.
+//             const delay = exploded
+//               ? mod.explodeDelay
+//               : MAX_DELAY - mod.explodeDelay;
+
+//             return (
+//               <ViroNode
+//                 key={moduleId}
+//                 animation={{
+//                   name: exploded
+//                     ? `explode_${moduleId}`
+//                     : `assemble_${moduleId}`,
+//                   run: true,
+//                   delay,
+//                 }}
+//               >
+//                 <Viro3DObject
+//                   source={MODULE_SOURCES[moduleId]}
+//                   type="GLB"
+//                   opacity={isFocused ? 1.0 : DIMMED_OPACITY}
+//                   onClick={() => handleModuleClick(moduleId)}
+//                   onLoadEnd={() => console.log(`module loaded: ${moduleId}`)}
+//                   onError={(event: any) =>
+//                     console.error(`module error (${moduleId}):`, event)
+//                   }
+//                 />
+//               </ViroNode>
+//             );
+//           })}
+
+//           {/* Exploded-view extras: guide lines back to the attachment
+//               point, plus tappable billboard labels per separated module */}
+//           {exploded &&
+//             MODULE_ORDER.map((moduleId) => {
+//               const mod = WARMER_MODULES[moduleId];
+//               if (mod.explodeOffset.every((v) => v === 0)) return null;
+//               const end = addVec(mod.anchor, mod.explodeOffset);
+//               return (
+//                 <ViroNode key={`guide-${moduleId}`}>
+//                   <ViroPolyline
+//                     points={[mod.anchor, end]}
+//                     thickness={0.006}
+//                     materials={["guideLine"]}
+//                     opacity={0.8}
+//                   />
+//                   <ViroNode
+//                     position={addVec(end, [0, 0, -0.12])}
+//                     onClick={() => handleModuleClick(moduleId)}
+//                   >
+//                     <ViroText
+//                       text={mod.label}
+//                       scale={[0.22, 0.22, 0.22]}
+//                       style={{
+//                         fontSize: 16,
+//                         color: "#FFFFFF",
+//                         fontWeight: "bold",
+//                         textAlign: "center",
+//                       }}
+//                       outerStroke={{
+//                         type: "Outline",
+//                         width: 2,
+//                         color: "#000000",
+//                       }}
+//                       transformBehaviors={["billboard"]}
+//                     />
+//                   </ViroNode>
+//                 </ViroNode>
+//               );
+//             })}
+//         </ViroNode>
+
+//         {/* Sub-part hotspots for the current detail scene */}
+//         {!isOverview &&
+//           scene.parts.map((part) => (
+//             <Hotspot
+//               key={part.id}
+//               part={part}
+//               isSelected={selectedPartId === part.id}
+//               onClick={() => onSelectPart(part)}
+//             />
+//           ))}
+//       </ViroNode>
+//     </ViroARScene>
+//   );
+// }
+
 import {
-  MODULE_ORDER,
-  ModuleId,
-  SceneKey,
+  ELEMENT_ORDER,
+  ElementId,
   Vec3,
-  WARMER_MODULES,
-  WARMER_SCENES,
-  WarmerPart,
-} from "@/constants/warmer-parts";
+  WARMER_ELEMENTS,
+  WarmerElement,
+} from "@/constants/warmer-elements";
+import { SceneKey, WarmerPart } from "@/constants/warmer-parts";
 import {
   Viro360Image,
   Viro3DObject,
   ViroAmbientLight,
   ViroAnimations,
   ViroARScene,
-  ViroMaterials,
   ViroNode,
-  ViroPolyline,
-  ViroSphere,
   ViroSpotLight,
-  ViroText,
 } from "@reactvision/react-viro";
 import React from "react";
 
-// The 5 module GLBs split from the original scan. Exported in place,
-// so loading all of them at the same position reassembles the warmer.
-const MODULE_SOURCES: Record<ModuleId, any> = {
-  heater: require("@/assets/models/heater_module.glb"),
-  bassinet: require("@/assets/models/bassinet_module.glb"),
-  controller: require("@/assets/models/controller_module.glb"),
-  tray: require("@/assets/models/tray_module.glb"),
-  stand: require("@/assets/models/stand_module.glb"),
+// v2: renders the new element-level OBJ/MTL part set (constants/warmer-elements.ts)
+// instead of the old 5-module GLBs. No hotspots, no 3D text labels this pass --
+// tapping an element selects + highlights it directly; info goes through the
+// existing RN tooltip overlay in app/vrscene.tsx (unchanged).
+//
+// Original GLB-driven version is kept as interactive-warmer-scene.tsx.bak.
+
+// ---- OBJ + MTL sources ---------------------------------------------------
+// Keep each .mtl alongside its .obj in assets/models/. support_frame is
+// still pending (see constants/warmer-elements.ts) -- its entry is left out
+// on purpose, and the render loop below skips any element with no source.
+// const ELEMENT_SOURCES: Partial<Record<ElementId, { obj: any; mtl: any }>> = {
+//   wheels: {
+//     obj: require("@/assets/models/Wheels.obj"),
+//     mtl: require("@/assets/models/Wheels.mtl"),
+//   },
+//   bed_bassinet: {
+//     obj: require("@/assets/models/Bed_Bassinet.obj"),
+//     mtl: require("@/assets/models/Bed_Bassinet.mtl"),
+//   },
+//   bassinet_shields: {
+//     obj: require("@/assets/models/Bassinet_Shields.obj"),
+//     mtl: require("@/assets/models/Bassinet_Shields.mtl"),
+//   },
+//   control_board: {
+//     obj: require("@/assets/models/Control_Board.obj"),
+//     mtl: require("@/assets/models/Control_Board.mtl"),
+//   },
+//   collimator_support: {
+//     obj: require("@/assets/models/Collimator_support.obj"),
+//     mtl: require("@/assets/models/Collimator_support.mtl"),
+//   },
+//   collimator_dissembled: {
+//     obj: require("@/assets/models/Collimator_dissembled.obj"),
+//     mtl: require("@/assets/models/Collimator_dissembled.mtl"),
+//   },
+//   // support_frame: add once Support_Frame.obj arrives
+// };
+
+const ELEMENT_SOURCES: Partial<Record<ElementId, { glbFile: any }>> = {
+  wheels: {
+    glbFile: require("@/assets/models/3D/wheels.glb"),
+  },
+  support_frame: {
+    glbFile: require("@/assets/models/3D/support_frame.glb"),
+  },
+  real_bed_bassinet: {
+    glbFile: require("@/assets/models/3D/real_bed_bassinet.glb"),
+  },
+  bassinet_shields: {
+    glbFile: require("@/assets/models/3D/bassinet_shields.glb"),
+  },
+  control_board: {
+    glbFile: require("@/assets/models/3D/control_board.glb"),
+  },
+  collimator_support: {
+    glbFile: require("@/assets/models/3D/collimator_support.glb"),
+  },
+  collimator_dissemble: {
+    glbFile: require("@/assets/models/3D/collimator_dissemble.glb"),
+  },
+  // support_frame: add once Support_Frame.obj arrives
 };
 
-const DIMMED_OPACITY = 0.3; // non-focused modules in detail scenes
+const DIMMED_OPACITY = 0.3;
 
-ViroMaterials.createMaterials({
-  hotspot: { diffuseColor: "#00A651", lightingModel: "Constant" },
-  hotspotSelected: { diffuseColor: "#FFD60A", lightingModel: "Constant" },
-  guideLine: { diffuseColor: "#9BE7C4", lightingModel: "Constant" },
-});
+// Uniform fix for the whole assembly: source files are in cm (Viro works in
+// meters) and CAD Z-up (Viro/AR is Y-up). Rotation sign is UNTESTED in Viro
+// -- Abdul confirmed [?]90 on X in Blender but the sign there doesn't
+// necessarily carry over. Flip to [90,0,0] if the model loads upside-down
+// or on its side.
+const GLOBAL_SCALE: Vec3 = [0.012, 0.012, 0.012];
+const GLOBAL_ROTATION: Vec3 = [-90, 90, 0];
+// Starting placement guess -- not yet tuned in AR. Adjust once you see it.
+const GLOBAL_POSITION: Vec3 = [0, -1.6, -2.0];
 
-// Per-module explode/assemble animations. Registered once from the
-// offsets in WARMER_MODULES so the data file stays the single source
-// of truth for removal paths.
+// Explode/assemble animations, generated per element from restPosition +
+// explodeOffset in warmer-elements.ts. Elements with explodeOffset: null
+// (currently just the pending support_frame) are skipped.
 const animationDefs: Record<string, any> = {
-  pulseUp: {
-    properties: { scaleX: 1.3, scaleY: 1.3, scaleZ: 1.3 },
-    duration: 600,
-    easing: "EaseInEaseOut",
+  selectPulseUp: {
+    properties: { scaleX: 1.15, scaleY: 1.15, scaleZ: 1.15 },
+    duration: 220,
+    easing: "EaseOut",
   },
-  pulseDown: {
+  selectPulseDown: {
     properties: { scaleX: 1.0, scaleY: 1.0, scaleZ: 1.0 },
-    duration: 600,
-    easing: "EaseInEaseOut",
+    duration: 220,
+    easing: "EaseIn",
   },
-  pulse: [["pulseUp", "pulseDown"]] as unknown as any,
+  selectPulse: [["selectPulseUp", "selectPulseDown"]] as unknown as any,
 };
-MODULE_ORDER.forEach((id) => {
-  const [ox, oy, oz] = WARMER_MODULES[id].explodeOffset;
+ELEMENT_ORDER.forEach((id) => {
+  const el = WARMER_ELEMENTS[id];
+  if (!el.explodeOffset) return;
+  const [rx, ry, rz] = el.restPosition;
+  const [ox, oy, oz] = el.explodeOffset;
   animationDefs[`explode_${id}`] = {
-    properties: { positionX: ox, positionY: oy, positionZ: oz },
+    properties: { positionX: rx + ox, positionY: ry + oy, positionZ: rz + oz },
     duration: 700,
     easing: "EaseInEaseOut",
   };
   animationDefs[`assemble_${id}`] = {
-    properties: { positionX: 0, positionY: 0, positionZ: 0 },
+    properties: { positionX: rx, positionY: ry, positionZ: rz },
     duration: 700,
     easing: "EaseInEaseOut",
   };
@@ -2003,10 +2916,13 @@ MODULE_ORDER.forEach((id) => {
 ViroAnimations.registerAnimations(animationDefs);
 
 const MAX_DELAY = Math.max(
-  ...MODULE_ORDER.map((id) => WARMER_MODULES[id].explodeDelay)
+  ...ELEMENT_ORDER.map((id) => WARMER_ELEMENTS[id].explodeDelay)
 );
 
-// viroAppProps contract between the RN layer (app/vrscene.tsx) and this scene
+// viroAppProps contract between the RN layer (app/vrscene.tsx) and this
+// scene. Kept identical to the old module version -- sceneKey/WarmerPart
+// still come from constants/warmer-parts.ts so app/vrscene.tsx (tabs,
+// titles, tooltip UI) needs no changes.
 export type WarmerSceneAppProps = {
   sceneKey: SceneKey;
   exploded: boolean;
@@ -2019,62 +2935,18 @@ type ViroSceneProps = {
   sceneNavigator: { viroAppProps: WarmerSceneAppProps };
 };
 
-function addVec(a: Vec3, b: Vec3): Vec3 {
-  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-}
-
-function Hotspot({
-  part,
-  isSelected,
-  onClick,
-}: {
-  part: WarmerPart;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <ViroNode position={part.position} onClick={onClick}>
-      <ViroSphere
-        radius={0.045}
-        materials={[isSelected ? "hotspotSelected" : "hotspot"]}
-        opacity={0.85}
-        animation={{ name: "pulse", run: true, loop: true }}
-      />
-      <ViroText
-        text={part.label}
-        position={[0, 0.09, 0]}
-        scale={[0.18, 0.18, 0.18]}
-        style={{
-          fontSize: 16,
-          color: "#FFFFFF",
-          fontWeight: "bold",
-          textAlign: "center",
-        }}
-        outerStroke={{ type: "Outline", width: 2, color: "#000000" }}
-        transformBehaviors={["billboard"]}
-      />
-    </ViroNode>
-  );
-}
-
 export default function InteractiveWarmerScene(props: ViroSceneProps) {
-  const { sceneKey, exploded, selectedPartId, onSelectPart, onNavigate } =
+  const { sceneKey, exploded, selectedPartId, onSelectPart } =
     props.sceneNavigator.viroAppProps;
 
-  const scene = WARMER_SCENES[sceneKey] ?? WARMER_SCENES.overview;
-  const isOverview = scene.key === "overview";
+  const isOverview = sceneKey === "overview";
 
-  const handleModuleClick = (moduleId: ModuleId) => {
-    const mod = WARMER_MODULES[moduleId];
-    if (mod.targetScene && mod.targetScene !== scene.key) {
-      onNavigate(mod.targetScene);
-      return;
-    }
+  const handleElementClick = (element: WarmerElement) => {
     onSelectPart({
-      id: `module-${mod.id}`,
-      label: mod.label,
-      description: mod.description,
-      position: [0, 0, 0],
+      id: element.id,
+      label: element.label,
+      description: element.notes ?? element.label,
+      position: [0, 0, 0], // unused by the RN tooltip overlay, kept for type compatibility
     });
   };
 
@@ -2084,117 +2956,71 @@ export default function InteractiveWarmerScene(props: ViroSceneProps) {
       <Viro360Image source={require("@/assets/models/hospital_room.jpg")} />
 
       {/* Lighting */}
-      <ViroAmbientLight color="#FFFFFF" intensity={500} />
+      <ViroAmbientLight color="#FFFFFF" intensity={400} />
       <ViroSpotLight
-        position={[0, 5, 0]}
-        direction={[0, -1, 0]}
-        color="#ffffff"
-        intensity={800}
+        position={[0, 6, 2]}
+        direction={[0, -1, -0.2]}
+        color="#FFFFFF"
+        intensity={900}
         castsShadow={true}
       />
       <ViroSpotLight
-        position={[0, 0, 5]}
-        direction={[0, 0, -1]}
-        color="#ffffff"
-        intensity={400}
+        position={[0, 2, 4]}
+        direction={[0, -0.3, -1]}
+        color="#FFFFFF"
+        intensity={250}
       />
 
       <ViroNode
-        position={scene.modelPosition}
-        scale={scene.modelScale}
-        rotation={scene.modelRotation}
+        position={[0, -2.4, -2.2]}
+        scale={[0.013, 0.013, 0.013]}
+        rotation={[0, 90, 0]}
       >
-        {/* Same [0,-0.9,0] offset the single model used, so the existing
-            per-scene framing presets still apply */}
-        <ViroNode position={[0, -0.9, 0]}>
-          {MODULE_ORDER.map((moduleId) => {
-            const mod = WARMER_MODULES[moduleId];
-            const isFocused =
-              !scene.focusModule || scene.focusModule === moduleId;
-            const isAnchor = mod.explodeOffset.every((v) => v === 0);
+        {ELEMENT_ORDER.map((id) => {
+          const element = WARMER_ELEMENTS[id];
+          const source = ELEMENT_SOURCES[id];
+          if (!source) return null; // support_frame -- not loaded yet
 
-            // Explode delays run smallest-first (tray, controller,
-            // bassinet, heater); assembling runs in reverse order.
-            const delay = exploded
-              ? mod.explodeDelay
-              : MAX_DELAY - mod.explodeDelay;
+          const isSelected = selectedPartId === element.id;
+          // A specific tap always wins: dim everything else regardless of
+          // scene. With nothing selected, fall back to the scene's module
+          // focus (same dimming behavior as the old version).
+          const dimmed = selectedPartId
+            ? !isSelected
+            : !isOverview && element.module !== sceneKey;
 
-            return (
-              <ViroNode
-                key={moduleId}
+          const delay = exploded
+            ? element.explodeDelay
+            : MAX_DELAY - element.explodeDelay;
+
+          return (
+            <ViroNode
+              key={id}
+              position={element.restPosition}
+              animation={{
+                name: exploded ? `explode_${id}` : `assemble_${id}`,
+                run: true,
+                delay,
+              }}
+            >
+              <Viro3DObject
+                source={source.glbFile}
+                type="GLB"
+                opacity={dimmed ? DIMMED_OPACITY : 1.0}
+                onClick={() => handleElementClick(element)}
+                onLoadEnd={() => console.log(`element loaded: ${id}`)}
+                onError={(event: any) =>
+                  console.error(`element error (${id}):`, event)
+                }
                 animation={{
-                  name: exploded
-                    ? `explode_${moduleId}`
-                    : `assemble_${moduleId}`,
-                  run: true,
-                  delay,
+                  name: "selectPulse",
+                  run: isSelected,
+                  loop: false,
                 }}
-              >
-                <Viro3DObject
-                  source={MODULE_SOURCES[moduleId]}
-                  type="GLB"
-                  opacity={isFocused ? 1.0 : DIMMED_OPACITY}
-                  onClick={() => handleModuleClick(moduleId)}
-                  onLoadEnd={() => console.log(`module loaded: ${moduleId}`)}
-                  onError={(event: any) =>
-                    console.error(`module error (${moduleId}):`, event)
-                  }
-                />
-              </ViroNode>
-            );
-          })}
-
-          {/* Exploded-view extras: guide lines back to the attachment
-              point, plus tappable billboard labels per separated module */}
-          {exploded &&
-            MODULE_ORDER.map((moduleId) => {
-              const mod = WARMER_MODULES[moduleId];
-              if (mod.explodeOffset.every((v) => v === 0)) return null;
-              const end = addVec(mod.anchor, mod.explodeOffset);
-              return (
-                <ViroNode key={`guide-${moduleId}`}>
-                  <ViroPolyline
-                    points={[mod.anchor, end]}
-                    thickness={0.006}
-                    materials={["guideLine"]}
-                    opacity={0.8}
-                  />
-                  <ViroNode
-                    position={addVec(end, [0, 0, -0.12])}
-                    onClick={() => handleModuleClick(moduleId)}
-                  >
-                    <ViroText
-                      text={mod.label}
-                      scale={[0.22, 0.22, 0.22]}
-                      style={{
-                        fontSize: 16,
-                        color: "#FFFFFF",
-                        fontWeight: "bold",
-                        textAlign: "center",
-                      }}
-                      outerStroke={{
-                        type: "Outline",
-                        width: 2,
-                        color: "#000000",
-                      }}
-                      transformBehaviors={["billboard"]}
-                    />
-                  </ViroNode>
-                </ViroNode>
-              );
-            })}
-        </ViroNode>
-
-        {/* Sub-part hotspots for the current detail scene */}
-        {!isOverview &&
-          scene.parts.map((part) => (
-            <Hotspot
-              key={part.id}
-              part={part}
-              isSelected={selectedPartId === part.id}
-              onClick={() => onSelectPart(part)}
-            />
-          ))}
+              />
+            </ViroNode>
+          );
+        })}
       </ViroNode>
     </ViroARScene>
   );
@@ -2336,232 +3162,158 @@ const styles = StyleSheet.create({
 });
 </file>
 
-<file path="components/temperature-bar.tsx">
-import { CORE_RANGE } from "@/lib/parameter-state";
-import React from "react";
-import { StyleSheet, View } from "react-native";
+<file path="components/temperature-slider.tsx">
+import { fontFamily } from "@/constants/fontFamily";
+import React, { useState } from "react";
+import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 
-/**
- * TemperatureBar
- *
- * Fills proportionally across [rangeMin, rangeMax] and colors the fill by how
- * far the value sits from the expected (clinical) band [normalMin, normalMax]:
- *   - green  : within the normal band
- *   - yellow : outside the band but by <= tolerance
- *   - red    : outside the band by more than tolerance
- *
- * rangeMin/rangeMax control the visual fill (e.g. core 34 -> set target,
- * ambient 20 -> 26). normalMin/normalMax control the color only.
- */
+const THUMB_SIZE = 28;
+const TRACK_HEIGHT = 10;
 
-const COLOR_NORMAL = "#0AC084"; // green
-const COLOR_WARN = "#FBEC47"; // yellow
-const COLOR_ALERT = "#FF5252"; // red
-
-const BAR_HEIGHT = 24;
-const BAR_RADIUS = 6;
-
-export interface TemperatureBarProps {
-  temperature: number;
-  rangeMin?: number;
-  rangeMax?: number;
-  normalMin?: number;
-  normalMax?: number;
-  tolerance?: number;
+export interface TemperatureSliderProps {
+  min?: number;
+  max?: number;
+  step?: number;
+  value: number;
+  onChange: (value: number) => void;
 }
 
-export function colorForTemperature(
-  temperature: number,
-  normalMin: number,
-  normalMax: number,
-  tolerance: number
-): string {
-  if (temperature >= normalMin && temperature <= normalMax) {
-    return COLOR_NORMAL;
-  }
-  const deviation =
-    temperature < normalMin ? normalMin - temperature : temperature - normalMax;
-  return deviation <= tolerance ? COLOR_WARN : COLOR_ALERT;
+function roundToStep(raw: number, min: number, step: number): number {
+  const stepped = Math.round((raw - min) / step) * step + min;
+  return Number(stepped.toFixed(2));
 }
 
-export function fillPercent(
-  temperature: number,
-  rangeMin: number,
-  rangeMax: number
-): number {
-  if (rangeMax <= rangeMin) return 0;
-  const pct = ((temperature - rangeMin) / (rangeMax - rangeMin)) * 100;
-  return Math.max(0, Math.min(100, pct));
-}
+export default function TemperatureSlider({
+  min = 33,
+  max = 39.5,
+  step = 0.1,
+  value,
+  onChange,
+}: TemperatureSliderProps) {
+  const [trackWidth, setTrackWidth] = useState(0);
 
-export default function TemperatureBar({
-  temperature,
-  rangeMin = 34,
-  rangeMax = 37.5,
-  normalMin = CORE_RANGE.min,
-  normalMax = CORE_RANGE.max,
-  tolerance = 0.2,
-}: TemperatureBarProps) {
-  const color = colorForTemperature(
-    temperature,
-    normalMin,
-    normalMax,
-    tolerance
-  );
-  const width = fillPercent(temperature, rangeMin, rangeMax);
+  const offset = useSharedValue(0);
+  const startOffset = useSharedValue(0);
+
+  const usable = Math.max(0, trackWidth - THUMB_SIZE);
+
+  React.useEffect(() => {
+    if (usable <= 0 || max <= min) return;
+    const ratio = (value - min) / (max - min);
+    offset.value = Math.max(0, Math.min(usable, ratio * usable));
+  }, [value, usable, min, max, offset]);
+
+  const commit = (px: number) => {
+    if (usable <= 0) return;
+    const ratio = px / usable;
+    const raw = min + ratio * (max - min);
+    onChange(roundToStep(raw, min, step));
+  };
+
+  const pan = Gesture.Pan()
+    .onStart(() => {
+      startOffset.value = offset.value;
+    })
+    .onUpdate((e) => {
+      const next = Math.max(
+        0,
+        Math.min(usable, startOffset.value + e.translationX)
+      );
+      offset.value = next;
+      runOnJS(commit)(next);
+    });
+
+  const tap = Gesture.Tap().onEnd((e) => {
+    const next = Math.max(0, Math.min(usable, e.x - THUMB_SIZE / 2));
+    offset.value = next;
+    runOnJS(commit)(next);
+  });
+
+  const gesture = Gesture.Race(pan, tap);
+
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: offset.value }],
+  }));
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: offset.value + THUMB_SIZE / 2,
+  }));
+
+  const onLayout = (e: LayoutChangeEvent) => {
+    setTrackWidth(e.nativeEvent.layout.width);
+  };
 
   return (
-    <View style={styles.track}>
-      <View
-        style={[styles.fill, { backgroundColor: color, width: `${width}%` }]}
-      />
+    <View style={styles.wrapper}>
+      <GestureDetector gesture={gesture}>
+        <View style={styles.trackArea} onLayout={onLayout}>
+          <View style={styles.trackBg} />
+          <Animated.View style={[styles.trackFill, fillStyle]} />
+          <Animated.View style={[styles.thumb, thumbStyle]} />
+        </View>
+      </GestureDetector>
+
+      <View style={styles.labels}>
+        <Text style={styles.label}>{min}°C</Text>
+        <Text style={styles.label}>{max}°C</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  track: {
+  wrapper: {
     width: "100%",
-    height: BAR_HEIGHT,
-    borderRadius: BAR_RADIUS,
-    backgroundColor: "#EEEEEE",
-    overflow: "hidden",
+    gap: 10,
   },
-  fill: {
-    height: "100%",
-    borderRadius: BAR_RADIUS,
+  trackArea: {
+    height: THUMB_SIZE,
+    justifyContent: "center",
+  },
+  trackBg: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: TRACK_HEIGHT,
+    borderRadius: TRACK_HEIGHT / 2,
+    backgroundColor: "#D9ECFF",
+  },
+  trackFill: {
+    position: "absolute",
+    left: 0,
+    height: TRACK_HEIGHT,
+    borderRadius: TRACK_HEIGHT / 2,
+    backgroundColor: "#1E90FF",
+  },
+  thumb: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: THUMB_SIZE / 2,
+    backgroundColor: "#0749FF",
+    borderWidth: 3,
+    borderColor: "#fff",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  labels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  label: {
+    fontSize: 13,
+    fontFamily: fontFamily.medium,
+    color: "#333",
   },
 });
-</file>
-
-<file path="components/vr-room-scene.tsx">
-import {
-  Viro360Image,
-  Viro3DObject,
-  ViroAmbientLight,
-  ViroNode,
-  ViroQuad,
-  ViroScene,
-  ViroSpotLight,
-  ViroText,
-} from "@reactvision/react-viro";
-import React, { useState } from "react";
-
-// Degrees the model turns per click.
-const STEP = 30;
-
-/**
- * Gaze-controlled VR room scene for Google Cardboard / Shinecon (Android GVR).
- *
- * Interaction model: the user looks at a floating arrow (gaze) and presses the
- * Bluetooth remote, which Android delivers as a mouse click and Viro surfaces
- * as onClick — the same path as the Cardboard trigger. Each arrow rotates the
- * warmer about an axis. A small center reticle shows the gaze point.
- *
- * Why gaze + click and not direct remote-to-rotation: the remote only emits
- * BTN_MOUSE (a click), no directional/movement events, so direction comes from
- * where the user looks, and the click commits the rotation.
- */
-
-type Axis = "x" | "y";
-
-function ArrowTarget({
-  label,
-  position,
-  onPress,
-}: {
-  label: string;
-  position: [number, number, number];
-  onPress: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-
-  return (
-    <ViroNode position={position}>
-      {/* Invisible-ish backing quad gives a comfortable gaze/click area */}
-      <ViroQuad
-        height={0.5}
-        width={0.5}
-        materials={hovered ? ["arrowActive"] : ["arrowIdle"]}
-        onHover={(isHovering: boolean) => setHovered(isHovering)}
-        onClick={() => onPress()}
-      />
-      <ViroText
-        text={label}
-        position={[0, 0, 0.01]}
-        scale={[0.5, 0.5, 0.5]}
-        style={{
-          fontSize: 36,
-          color: hovered ? "#FFD60A" : "#FFFFFF",
-          fontWeight: "bold",
-          textAlign: "center",
-        }}
-        outerStroke={{ type: "Outline", width: 2, color: "#000000" }}
-      />
-    </ViroNode>
-  );
-}
-
-export default function VRRoomScene() {
-  const [rotX, setRotX] = useState(0);
-  const [rotY, setRotY] = useState(0);
-
-  const rotate = (axis: Axis, dir: number) => {
-    if (axis === "x") setRotX((r) => r + dir * STEP);
-    else setRotY((r) => r + dir * STEP);
-  };
-
-  return (
-    <ViroScene>
-      <Viro360Image source={require("@/assets/models/hospital_room.jpg")} />
-      <ViroAmbientLight color="#FFFFFF" intensity={500} />
-      <ViroSpotLight
-        position={[0, 5, 0]}
-        direction={[0, -1, 0]}
-        color="#ffffff"
-        intensity={800}
-      />
-
-      {/* Warmer model, rotated by gaze+click */}
-      <ViroNode position={[0, -0.5, -2]} rotation={[rotX, rotY, 0]}>
-        <Viro3DObject
-          source={require("@/assets/models/neonatalXR.glb")}
-          type="GLB"
-          scale={[1.6, 1.6, 1.6]}
-          position={[0, -0.9, 0]}
-          onError={(e: any) => console.error("VR model error:", e)}
-        />
-      </ViroNode>
-
-      {/* Arrow controls around the model */}
-      <ArrowTarget
-        label="<"
-        position={[-1.4, -0.5, -2]}
-        onPress={() => rotate("y", -1)}
-      />
-      <ArrowTarget
-        label=">"
-        position={[1.4, -0.5, -2]}
-        onPress={() => rotate("y", 1)}
-      />
-      <ArrowTarget
-        label="^"
-        position={[0, 0.6, -2]}
-        onPress={() => rotate("x", -1)}
-      />
-      <ArrowTarget
-        label="v"
-        position={[0, -1.6, -2]}
-        onPress={() => rotate("x", 1)}
-      />
-
-      {/* Center gaze reticle: a small dot fixed in front of the camera */}
-      <ViroNode position={[0, 0, -1]}>
-        <ViroQuad height={0.015} width={0.015} materials={["reticle"]} />
-      </ViroNode>
-    </ViroScene>
-  );
-}
 </file>
 
 <file path="constants/components-content.ts">
@@ -2695,6 +3447,161 @@ export const COMPONENTS = {
 };
 </file>
 
+<file path="constants/procedures-content.ts">
+// Content for Module 03: Procedures, Maintenance & Troubleshooting (merged).
+// Verified against the same sources as the other modules (NEST360 Biomedical
+// Engineer Education Module and corroborating clinical/manufacturer refs).
+// Generic radiant-warmer baseline; a specific model's service manual overrides.
+
+export interface MaintenanceItem {
+  text: string;
+}
+
+export interface MaintenanceGroup {
+  heading: string;
+  tag: string; // EVERY USE, WEEKLY, ...
+  items: MaintenanceItem[];
+}
+
+export interface FaultBlock {
+  symptom: string;
+  causes: string[];
+}
+
+export const PROCEDURES = {
+  moduleLabel: "MODULE 03 OF 06",
+  number: "3",
+  title: "PROCEDURES & MAINTENANCES",
+  intro:
+    "Pre-use checks and preventive maintenance, organized by interval, followed by symptom-to-cause troubleshooting. Work through the checks in order, then use the fault guide to reason from what you observe.",
+
+  calloutLabel: "TEST vs CALIBRATE",
+  calloutBody:
+    "Heating elements are tested with a digital multimeter for voltage and continuity, not calibrated. Temperature sensing must be calibrated to the manufacturer's schedule.",
+
+  maintenanceNumber: "3.1",
+  maintenanceHeading: "MAINTENANCE BY INTERVAL",
+  groups: [
+    {
+      heading: "Pre-use checks",
+      tag: "EVERY USE",
+      items: [
+        {
+          text: "Visually inspect the unit, probe lead, and power cord for damage or wear.",
+        },
+        {
+          text: "Confirm the skin probe reads a plausible temperature and is undamaged.",
+        },
+        {
+          text: "Test audible and visual alarms (e.g. trigger a probe-disconnect alarm).",
+        },
+        { text: "Verify mains power and, if fitted, battery backup." },
+        {
+          text: "Check bassinet brakes lock and the platform tilts and holds.",
+        },
+      ],
+    },
+    {
+      heading: "Weekly",
+      tag: "WEEKLY",
+      items: [
+        {
+          text: "Test the heating element with a digital multimeter for voltage and continuity.",
+        },
+        { text: "Inspect and function-test the skin temperature probe." },
+      ],
+    },
+    {
+      heading: "Monthly",
+      tag: "MONTHLY",
+      items: [
+        {
+          text: "Test the power-loss alarm by disconnecting mains with the unit running.",
+        },
+        { text: "Run the built-in self-diagnosis routine and log any codes." },
+      ],
+    },
+    {
+      heading: "Quarterly",
+      tag: "QUARTERLY",
+      items: [
+        {
+          text: "Perform functional checks across all modes (servo and manual).",
+        },
+        {
+          text: "Complete electrical safety testing (earth continuity, leakage current).",
+        },
+      ],
+    },
+    {
+      heading: "Annual",
+      tag: "ANNUAL",
+      items: [
+        { text: "Full inspection per the manufacturer's service manual." },
+        {
+          text: "Calibrate temperature sensing to the manufacturer's schedule.",
+        },
+        {
+          text: "Confirm critical spares (probe, fuses, heating element) are on hand.",
+        },
+      ],
+    },
+  ] as MaintenanceGroup[],
+
+  safetyLabel: "SAFETY RULE",
+  safetyBody:
+    "Remove the unit from service on any alarm or control failure you cannot resolve. Stop immediately at any sign of smoke or a burning smell, do not continue use under any circumstances.",
+
+  troubleshootingNumber: "3.2",
+  troubleshootingHeading: "FAULTS & TROUBLESHOOTING",
+  troubleshootingIntro:
+    "Troubleshooting is symptom-to-cause reasoning. Start from what you observe, then work through the likely causes.",
+  faults: [
+    {
+      symptom: "No heat from the element",
+      causes: [
+        "Faulty heating element",
+        "Faulty control PCB",
+        "Broken or loose wiring",
+        "Blown fuse on the heater circuit",
+      ],
+    },
+    {
+      symptom: "Probe alarm or erratic skin temperature",
+      causes: [
+        "Probe disconnected or loose at the unit",
+        "Damaged probe or lead",
+        "Poor skin contact, probe detached from the infant",
+      ],
+    },
+    {
+      symptom: "Unit will not power on / battery fault",
+      causes: [
+        "No mains supply or tripped outlet",
+        "Blown mains fuse",
+        "Failing battery or power-supply board",
+      ],
+    },
+    {
+      symptom: "Blank or faulty display",
+      causes: [
+        "Display module failure",
+        "Loose display ribbon connector",
+        "Control PCB fault",
+      ],
+    },
+    {
+      symptom: "Unit overheats / over-temp alarm",
+      causes: [
+        "Control unit driving full output incorrectly",
+        "Stuck heater relay",
+        "Setpoint or mode misconfigured, verify the over-temp cutout engages",
+      ],
+    },
+  ] as FaultBlock[],
+};
+</file>
+
 <file path="constants/theme.ts">
 /**
  * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
@@ -2803,7 +3710,7 @@ export const MODULES: ModuleMeta[] = [
     blurb: "Symptom to cause reasoning and the safety rules that follow",
     accent: "#9EE9C5",
     icon: "warning",
-    route: "/mobilevr",
+    route: "/training/assessment",
   },
 ];
 
@@ -2861,16 +3768,17 @@ export const ORIENTATION = {
 <file path="constants/warmer-parts.ts">
 // Scene + part definitions for the interactive neonatal warmer VR experience.
 //
-// The warmer is now composed of 5 module GLBs (split from the original scan).
-// All modules load at the same position and reassemble the full warmer.
-// Each module is directly tappable:
-//   - overview scene: tapping a module navigates to its detail scene
-//     (or shows an info card for modules without a scene, like the tray)
-//   - detail scenes: the focused module is fully visible, others are dimmed;
-//     sub-part hotspots provide component-level tooltips
+// COORDINATE SYSTEM (measured from the scan GLB):
+//   - The raw scan is Z-up-negative: floor at z=0, top of heater at z=-1.06.
+//   - Model FRONT (control panel / caregiver side) is -Y.
+//   - The scene stands the model upright with a [90,0,0] rotation wrapper,
+//     so all anchors, explodeOffsets, and hotspot positions below are in
+//     RAW MODEL SPACE and rotate together with the geometry.
 //
-// Hotspot `position` values are in the LOCAL space of the model's parent
-// ViroNode. Tune them by eye until each marker hugs its part.
+// Measured module centroids (raw model space):
+//   stand base [0.02, 0.01, -0.07] | column [0, 0, -0.34]
+//   bassinet   [0.01, 0.04, -0.46] | tray   [-0.22, -0.08, -0.72]
+//   controller [-0.01,-0.13, -0.73] | heater [0.01, 0.02, -0.92]
 
 export type Vec3 = [number, number, number];
 
@@ -2884,16 +3792,11 @@ export type WarmerModule = {
   description: string;
   /** Scene to open when this module is tapped in the overview (optional) */
   targetScene?: SceneKey;
-  /**
-   * Where the module attaches to the stand, in the model's local space.
-   * Derived from the scan's actual module centroids. Used as the start
-   * point of the exploded-view guide line and as the label anchor.
-   */
+  /** Module centroid in raw model space (start of guide line, label anchor) */
   anchor: Vec3;
   /**
-   * Removal-path offset applied in exploded view, in model-local axes.
-   * Mimics how the part physically comes off: heater lifts up the pole,
-   * tray and controller pull out sideways, bassinet slides forward.
+   * Removal-path offset applied in exploded view, in raw model axes:
+   *   up = -Z, front = -Y, tray side = -X.
    */
   explodeOffset: Vec3;
   /** Stagger delay (ms) so parts separate sequentially, not all at once */
@@ -2906,7 +3809,7 @@ export const WARMER_MODULES: Record<ModuleId, WarmerModule> = {
     label: "Radiant Heater Unit",
     description: "Tap to explore the radiant heater assembly.",
     targetScene: "heater",
-    anchor: [0, 0.03, -0.91],
+    anchor: [0.01, 0.02, -0.92],
     explodeOffset: [0, 0, -0.45], // lifts UP off the pole (model up = -Z)
     explodeDelay: 600,
   },
@@ -2915,8 +3818,8 @@ export const WARMER_MODULES: Record<ModuleId, WarmerModule> = {
     label: "Baby Carriage (Bassinet)",
     description: "Tap to explore the bassinet and mattress platform.",
     targetScene: "bassinet",
-    anchor: [0.01, 0.03, -0.48],
-    explodeOffset: [0, 0.45, 0], // slides FORWARD off the column
+    anchor: [0.01, 0.04, -0.46],
+    explodeOffset: [0, -0.45, 0], // slides FORWARD off the column (front = -Y)
     explodeDelay: 400,
   },
   controller: {
@@ -2924,8 +3827,8 @@ export const WARMER_MODULES: Record<ModuleId, WarmerModule> = {
     label: "Control Panel",
     description: "Tap to explore the controller and alarm system.",
     targetScene: "controller",
-    anchor: [0.03, -0.15, -0.69],
-    explodeOffset: [0.5, 0, 0], // pulls out to the side
+    anchor: [-0.01, -0.13, -0.73],
+    explodeOffset: [0.5, 0, 0], // pulls out sideways (away from the tray side)
     explodeDelay: 200,
   },
   tray: {
@@ -2933,8 +3836,8 @@ export const WARMER_MODULES: Record<ModuleId, WarmerModule> = {
     label: "Instrument Tray",
     description:
       "Side shelf for instruments and supplies, keeping essentials within the caregiver's reach during procedures.",
-    anchor: [-0.19, -0.07, -0.71],
-    explodeOffset: [-0.5, 0, 0], // slides out on its own side
+    anchor: [-0.22, -0.08, -0.72],
+    explodeOffset: [-0.5, 0, 0], // slides out on its own side (-X)
     explodeDelay: 0,
   },
   stand: {
@@ -2942,7 +3845,7 @@ export const WARMER_MODULES: Record<ModuleId, WarmerModule> = {
     label: "Stand & IV Pole",
     description:
       "Support column, legs and casters that carry the unit, plus the IV pole hooks for fluid bags. Casters lock to keep the warmer stationary.",
-    anchor: [0, 0, -0.3],
+    anchor: [0.02, 0.01, -0.3],
     explodeOffset: [0, 0, 0], // the stand is the fixed anchor of the assembly
     explodeDelay: 0,
   },
@@ -2960,7 +3863,7 @@ export type WarmerPart = {
   id: string;
   label: string;
   description: string;
-  /** Hotspot position relative to the model node */
+  /** Hotspot position in RAW MODEL SPACE (inside the rotation wrapper) */
   position: Vec3;
 };
 
@@ -2977,16 +3880,20 @@ export type WarmerScene = {
   parts: WarmerPart[];
 };
 
+// Framing math: with the [0,-0.9,0] inner offset and the upright wrapper,
+// world height of a model point z is:  pos.y + scale * (-0.9 - z)
+// (z is negative going up, so -z is the point's height above the floor).
 export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
   // ----- SCENE 1: principal / overview -----
   overview: {
     key: "overview",
     title: "Neonatal Warmer Overview",
     subtitle: "Tap a part of the warmer to explore it",
-    modelPosition: [0, -0.5, -2],
-    modelScale: [1.6, 1.6, 1.6],
+    // Bigger: 1.6 -> 2.4. Lowered for handheld AR viewing (phone camera
+    // height, not standing eye height).
+    modelPosition: [0, -0.1, -2.4],
+    modelScale: [2.4, 2.4, 2.4],
     modelRotation: [0, 0, 0],
-    // No floating nav markers anymore: the modules themselves are tappable.
     parts: [],
   },
 
@@ -2996,7 +3903,8 @@ export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
     title: "Radiant Heater Unit",
     subtitle: "Tap a marker to learn what each component does",
     focusModule: "heater",
-    modelPosition: [0, -1.2, -1.6],
+    // Heater head (z=-0.92) near camera height, lowered for handheld AR
+    modelPosition: [0, -0.4, -1.6],
     modelScale: [2.2, 2.2, 2.2],
     modelRotation: [0, 0, 0],
     parts: [
@@ -3005,21 +3913,21 @@ export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
         label: "Heating Element",
         description:
           "Quartz/ceramic radiant element that emits infrared energy downward to warm the infant without warming the surrounding air.",
-        position: [0, 0.95, 0],
+        position: [0, 0.02, -0.96],
       },
       {
         id: "reflector",
         label: "Parabolic Reflector",
         description:
           "Focuses and evenly distributes infrared radiation across the mattress area so there are no hot or cold spots.",
-        position: [0.15, 0.9, 0.05],
+        position: [0.06, 0.12, -0.93],
       },
       {
         id: "heater-guard",
         label: "Protective Grill",
         description:
           "Metal guard that prevents accidental contact with the hot element and stops objects falling onto the infant.",
-        position: [0, 0.82, 0.1],
+        position: [0, 0.02, -0.85],
       },
     ],
   },
@@ -3030,7 +3938,8 @@ export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
     title: "Baby Carriage (Bassinet)",
     subtitle: "Tap a marker to learn what each component does",
     focusModule: "bassinet",
-    modelPosition: [0, -0.3, -1.4],
+    // Bassinet (z=-0.46) near camera height, lowered for handheld AR
+    modelPosition: [0, 0.4, -1.5],
     modelScale: [2.0, 2.0, 2.0],
     modelRotation: [0, 0, 0],
     parts: [
@@ -3039,21 +3948,21 @@ export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
         label: "Mattress Platform",
         description:
           "X-ray translucent platform that supports the infant. Often tiltable (Trendelenburg / reverse) for clinical procedures.",
-        position: [0, -0.15, 0.2],
+        position: [0, 0.04, -0.58],
       },
       {
         id: "side-panels",
         label: "Drop-down Side Panels",
         description:
           "Transparent side walls that keep the infant safe while allowing observation. They fold down for full access during procedures.",
-        position: [0.35, -0.05, 0.2],
+        position: [0.15, 0.04, -0.55],
       },
       {
         id: "skin-probe",
         label: "Skin Temperature Probe",
         description:
           "Sensor attached to the infant's skin. Feeds temperature readings to the controller for servo (baby-controlled) mode.",
-        position: [-0.2, -0.12, 0.25],
+        position: [-0.08, -0.14, -0.55],
       },
     ],
   },
@@ -3064,7 +3973,8 @@ export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
     title: "Control Panel",
     subtitle: "Tap a marker to learn what each component does",
     focusModule: "controller",
-    modelPosition: [-0.4, -0.5, -1.3],
+    // Controller (z=-0.73) near camera height, lowered for handheld AR
+    modelPosition: [0, 0, -1.4],
     modelScale: [2.2, 2.2, 2.2],
     modelRotation: [0, -20, 0],
     parts: [
@@ -3073,21 +3983,21 @@ export const WARMER_SCENES: Record<SceneKey, WarmerScene> = {
         label: "Temperature Display",
         description:
           "Shows set temperature, measured skin temperature, and heater output percentage at a glance.",
-        position: [0.45, 0.15, 0.2],
+        position: [0, -0.21, -0.75],
       },
       {
         id: "mode-select",
         label: "Mode Selector",
         description:
           "Switches between Manual mode (fixed heater power) and Servo mode (auto-adjusts power based on the skin probe).",
-        position: [0.45, 0.05, 0.2],
+        position: [0.06, -0.21, -0.7],
       },
       {
         id: "alarms",
         label: "Alarm System",
         description:
           "Audible and visual alarms for high/low temperature, probe failure, and power interruption to keep the infant safe.",
-        position: [0.52, 0.1, 0.2],
+        position: [-0.06, -0.21, -0.77],
       },
     ],
   },
@@ -3107,6 +4017,120 @@ export const SCENE_ORDER: SceneKey[] = [
 
 <file path="hooks/use-color-scheme.web.ts">
 
+</file>
+
+<file path="hooks/use-live-parameters.ts">
+import { PARAMETERS_TABLE, supabase } from "@/lib/supabase";
+import { useEffect, useRef, useState } from "react";
+
+export interface ParameterRow {
+  device_timestamp: string | number | null;
+  core_temp: number | null;
+  ambient_temp: number | null;
+  humidity: number | null;
+  set_target: number | null;
+  heater_power: number | null;
+  fault_status: string | boolean | null;
+  init_phase: boolean | null;
+  mains_power: boolean | null;
+  system_enabled: boolean | null;
+}
+
+export type ConnectionState = "connecting" | "live" | "offline";
+
+// Poll fallback interval (ms) used if realtime isn't available.
+const POLL_MS = 5000;
+
+async function fetchLatest(): Promise<ParameterRow | null> {
+  const { data, error } = await supabase
+    .from(PARAMETERS_TABLE)
+    .select("*")
+    .order("device_timestamp", { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error("Supabase fetch error:", error.message);
+    return null;
+  }
+  return (data?.[0] as ParameterRow) ?? null;
+}
+
+/**
+ * Subscribes to the latest device parameters.
+ *
+ * Strategy: fetch the latest row immediately on mount so the UI has data, then
+ * open a realtime channel for INSERT/UPDATE pushes. If realtime never reaches
+ * SUBSCRIBED (table not enabled for realtime, network), fall back to polling.
+ */
+export function useLiveParameters() {
+  const [row, setRow] = useState<ParameterRow | null>(null);
+  const [status, setStatus] = useState<ConnectionState>("connecting");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const startPolling = () => {
+      if (pollRef.current) return;
+      pollRef.current = setInterval(async () => {
+        const latest = await fetchLatest();
+        if (mounted && latest) setRow(latest);
+      }, POLL_MS);
+    };
+
+    const stopPolling = () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+
+    fetchLatest().then((latest) => {
+      if (!mounted) return;
+      console.log("[INITIAL] latest row:", JSON.stringify(latest, null, 2));
+      if (latest) setRow(latest);
+    });
+
+    const channel = supabase
+      .channel("parameters-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: PARAMETERS_TABLE },
+        (payload) => {
+          if (!mounted) return;
+          console.log(
+            "[REALTIME] new row:",
+            JSON.stringify(payload.new, null, 2)
+          );
+          const next = payload.new as ParameterRow;
+          if (next) setRow(next);
+        }
+      )
+      .subscribe((channelStatus) => {
+        console.log("[REALTIME] channel status:", channelStatus);
+        if (!mounted) return;
+        if (channelStatus === "SUBSCRIBED") {
+          setStatus("live");
+          stopPolling();
+        } else if (
+          channelStatus === "CHANNEL_ERROR" ||
+          channelStatus === "TIMED_OUT" ||
+          channelStatus === "CLOSED"
+        ) {
+          setStatus("offline");
+          startPolling();
+        }
+      });
+
+    return () => {
+      mounted = false;
+      stopPolling();
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  return { row, status };
+}
 </file>
 
 <file path="hooks/use-swipe-tab.ts">
@@ -3165,6 +4189,62 @@ export default function useSwipeTabs() {
 
 <file path="hooks/use-theme-color.ts">
 
+</file>
+
+<file path="lib/parameter-state.ts">
+// Derives the human "state" label each card shows, from a value and a safe
+// range. Thresholds reflect the copy already in the cards (core 36.5-36.7,
+// humidity 30-50). Adjust to match your clinical thresholds.
+
+export type Band = "normal" | "low" | "high";
+
+export function bandFor(value: number | null, min: number, max: number): Band {
+  if (value == null || Number.isNaN(value)) return "normal";
+  if (value < min) return "low";
+  if (value > max) return "high";
+  return "normal";
+}
+
+export const CORE_RANGE = { min: 34.5, max: 36.7 };
+export const AMBIENT_RANGE = { min: 22, max: 26 };
+export const HUMIDITY_RANGE = { min: 50, max: 80 };
+
+// Format a possibly-null number to a fixed value, with a 0 fallback.
+export function fmt(value: number | null, digits = 1): number {
+  if (value == null || Number.isNaN(value)) return 0;
+  return Number(value.toFixed(digits));
+}
+</file>
+
+<file path="lib/supabase.ts">
+import { createClient } from "@supabase/supabase-js";
+
+// NOTE: the anon key is a public client key (safe to ship in an app), but for
+// cleanliness move these into app config / env (e.g. expo-constants extra)
+// rather than hardcoding long-term.
+const SUPABASE_URL = "https://nxpurdeeleevjqtlzymm.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54cHVyZGVlbGVldmpxdGx6eW1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3ODI5MTMsImV4cCI6MjA5NzM1ODkxM30.8UREPVHgqMQycjDAPAeH9GFkjw-uKMgN-SXtG14PpXU";
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false },
+});
+
+export const PARAMETERS_TABLE = "Parameters";
+export const COMMANDS_TABLE = "commands";
+
+// --- SEND DEVICE FUNCTION ---
+export async function sendDeviceCommand(action: string, value: number = 0) {
+  const { error } = await supabase
+    .from(COMMANDS_TABLE)
+    .insert([{ action, value, status: "PENDING" }]);
+
+  if (error) {
+    console.error("Failed to send command:", error.message);
+  } else {
+    console.log(`Command Sent: ${action} = ${value}`);
+  }
+}
 </file>
 
 <file path="scripts/reset-project.js">
@@ -3316,6 +4396,33 @@ declare module "*.svg" {
   const content: React.FC<SvgProps>;
   export default content;
 }
+
+declare module "*.svg" {
+  import React from "react";
+  import { SvgProps } from "react-native-svg";
+  const content: React.FC<SvgProps>;
+  export default content;
+}
+
+// 3D model assets, bundled by Metro (see metro.config.js assetExts) but
+// previously untyped -- require() worked at runtime, tsc just had nothing
+// to say about it. Declared here so editor/tsc stop flagging these imports.
+// declare module "*.obj" {
+//   const content: any;
+//   export default content;
+// }
+// declare module "*.mtl" {
+//   const content: any;
+//   export default content;
+// }
+// declare module "*.glb" {
+//   const content: any;
+//   export default content;
+// }
+// declare module "*.gltf" {
+//   const content: any;
+//   export default content;
+// }
 </file>
 
 <file path="eslint.config.js">
@@ -3452,6 +4559,65 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+</file>
+
+<file path="app/mobilevr.tsx">
+import VRRoomScene from "@/components/vr-room-scene";
+import { ViroMaterials, ViroVRSceneNavigator } from "@reactvision/react-viro";
+import { router } from "expo-router";
+import React from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+// Register materials once at module load. Guard so fast-refresh re-runs don't
+// throw on duplicate registration.
+try {
+  ViroMaterials.createMaterials({
+    arrowIdle: { diffuseColor: "rgba(255,255,255,0.18)" },
+    arrowActive: { diffuseColor: "rgba(7,73,255,0.55)" },
+    reticle: { diffuseColor: "rgba(255,255,255,0.9)" },
+  });
+} catch {
+  // already registered
+}
+
+/**
+ * Mobile VR screen for Google Cardboard / Shinecon on Android (GVR).
+ *
+ * Stereo via ViroVRSceneNavigator + vrModeEnabled. Rotation of the model is
+ * handled inside the scene via gaze + remote click (see vr-room-scene).
+ * onExitViro navigates away so the view isn't left blank after exit.
+ */
+export default function MobileVRScreen() {
+  return (
+    <View style={styles.container}>
+      <ViroVRSceneNavigator
+        vrModeEnabled={true}
+        pbrEnabled
+        initialScene={{ scene: VRRoomScene }}
+        onExitViro={() => router.back()}
+        style={styles.flex}
+      />
+      <TouchableOpacity style={styles.exit} onPress={() => router.back()}>
+        <Text style={styles.exitText}>Exit</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#000" },
+  flex: { flex: 1 },
+  exit: {
+    position: "absolute",
+    top: 50,
+    left: 20,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  exitText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+});
 </file>
 
 <file path="components/details-card.tsx">
@@ -3828,6 +4994,214 @@ const styles = StyleSheet.create({
 });
 </file>
 
+<file path="components/temperature-bar.tsx">
+import { CORE_RANGE } from "@/lib/parameter-state";
+import React from "react";
+import { StyleSheet, View } from "react-native";
+
+/**
+ * TemperatureBar
+ *
+ * Fills proportionally across [rangeMin, rangeMax] and colors the fill by how
+ * far the value sits from the expected (clinical) band [normalMin, normalMax]:
+ *   - green  : within the normal band
+ *   - yellow : outside the band but by <= tolerance
+ *   - red    : outside the band by more than tolerance
+ *
+ * rangeMin/rangeMax control the visual fill (e.g. core 34 -> set target,
+ * ambient 20 -> 26). normalMin/normalMax control the color only.
+ */
+
+const COLOR_NORMAL = "#0AC084"; // green
+const COLOR_WARN = "#FBEC47"; // yellow
+const COLOR_ALERT = "#FF5252"; // red
+
+const BAR_HEIGHT = 24;
+const BAR_RADIUS = 6;
+
+export interface TemperatureBarProps {
+  temperature: number;
+  rangeMin?: number;
+  rangeMax?: number;
+  normalMin?: number;
+  normalMax?: number;
+  tolerance?: number;
+}
+
+export function colorForTemperature(
+  temperature: number,
+  normalMin: number,
+  normalMax: number,
+  tolerance: number
+): string {
+  if (temperature >= normalMin && temperature <= normalMax) {
+    return COLOR_NORMAL;
+  }
+  const deviation =
+    temperature < normalMin ? normalMin - temperature : temperature - normalMax;
+  return deviation <= tolerance ? COLOR_WARN : COLOR_ALERT;
+}
+
+export function fillPercent(
+  temperature: number,
+  rangeMin: number,
+  rangeMax: number
+): number {
+  if (rangeMax <= rangeMin) return 0;
+  const pct = ((temperature - rangeMin) / (rangeMax - rangeMin)) * 100;
+  return Math.max(0, Math.min(100, pct));
+}
+
+export default function TemperatureBar({
+  temperature,
+  rangeMin = 34,
+  rangeMax = 37.5,
+  normalMin = CORE_RANGE.min,
+  normalMax = CORE_RANGE.max,
+  tolerance = 0.2,
+}: TemperatureBarProps) {
+  const color = colorForTemperature(
+    temperature,
+    normalMin,
+    normalMax,
+    tolerance
+  );
+  const width = fillPercent(temperature, rangeMin, rangeMax);
+
+  return (
+    <View style={styles.track}>
+      <View
+        style={[styles.fill, { backgroundColor: color, width: `${width}%` }]}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  track: {
+    width: "100%",
+    height: BAR_HEIGHT,
+    borderRadius: BAR_RADIUS,
+    backgroundColor: "#EEEEEE",
+    overflow: "hidden",
+  },
+  fill: {
+    height: "100%",
+    borderRadius: BAR_RADIUS,
+  },
+});
+</file>
+
+<file path="components/vr-room-scene.tsx">
+import {
+  Viro360Image,
+  Viro3DObject,
+  ViroAmbientLight,
+  ViroNode,
+  ViroQuad,
+  ViroScene,
+  ViroSpotLight,
+  ViroText,
+} from "@reactvision/react-viro";
+import React, { useState } from "react";
+
+// Degrees the model turns per click.
+const STEP = 30;
+
+/**
+ * Gaze-controlled VR room scene for Google Cardboard / Shinecon (Android GVR).
+ *
+ * Interaction model: the user looks at a floating arrow (gaze) and presses the
+ * Bluetooth remote, which Android delivers as a mouse click and Viro surfaces
+ * as onClick — the same path as the Cardboard trigger. Each arrow rotates the
+ * warmer about an axis. A small center reticle shows the gaze point.
+ *
+ * Why gaze + click and not direct remote-to-rotation: the remote only emits
+ * BTN_MOUSE (a click), no directional/movement events, so direction comes from
+ * where the user looks, and the click commits the rotation.
+ */
+
+type Axis = "x" | "y";
+
+function ArrowTarget({
+  label,
+  position,
+  onPress,
+}: {
+  label: string;
+  position: [number, number, number];
+  onPress: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <ViroNode position={position}>
+      {/* Invisible-ish backing quad gives a comfortable gaze/click area */}
+      <ViroQuad
+        height={0.5}
+        width={0.5}
+        materials={hovered ? ["arrowActive"] : ["arrowIdle"]}
+        onHover={(isHovering: boolean) => setHovered(isHovering)}
+        onClick={() => onPress()}
+      />
+      <ViroText
+        text={label}
+        position={[0, 0, 0.01]}
+        scale={[0.5, 0.5, 0.5]}
+        style={{
+          fontSize: 36,
+          color: hovered ? "#FFD60A" : "#FFFFFF",
+          fontWeight: "bold",
+          textAlign: "center",
+        }}
+        outerStroke={{ type: "Outline", width: 2, color: "#000000" }}
+      />
+    </ViroNode>
+  );
+}
+
+export default function VRRoomScene() {
+  const [rotX, setRotX] = useState(0);
+  const [rotY, setRotY] = useState(0);
+
+  const rotate = (axis: Axis, dir: number) => {
+    if (axis === "x") setRotX((r) => r + dir * STEP);
+    else setRotY((r) => r + dir * STEP);
+  };
+
+  return (
+    <ViroScene>
+      <Viro360Image source={require("@/assets/models/hospital_room.jpg")} />
+      <ViroAmbientLight color="#FFFFFF" intensity={500} />
+      <ViroSpotLight
+        position={[0, 5, 0]}
+        direction={[0, -1, 0]}
+        color="#ffffff"
+        intensity={800}
+      />
+
+      {/* Warmer model, rotated by gaze+click */}
+      <ViroNode position={[0, -0.5, -2]} rotation={[rotX, rotY, 0]}>
+        <Viro3DObject
+          source={require("@/assets/models/3D/nooosi.glb")}
+          type="GLB"
+          scale={[0.002, 0.002, 0.002]}
+          position={[0, -0.9, 0.7]}
+          onError={(e: any) => console.error("VR model error:", e)}
+        />
+      </ViroNode>
+
+      {/* Arrow controls around the model */}
+
+      {/* Center gaze reticle: a small dot fixed in front of the camera */}
+      <ViroNode position={[0, 0, -1]}>
+        <ViroQuad height={0.015} width={0.015} materials={["reticle"]} />
+      </ViroNode>
+    </ViroScene>
+  );
+}
+</file>
+
 <file path="constants/fontFamily.ts">
 export const fontFamily = {
   black: "GeistMonoBlack",
@@ -3890,154 +5264,6 @@ app-example
 *.mtl
 *.hdr
 *.exr
-</file>
-
-<file path="app/(tabs)/training.tsx">
-import { fontFamily } from "@/constants/fontFamily";
-import { MODULES, ModuleMeta } from "@/constants/training-content";
-import { useRouter } from "expo-router";
-import {
-  Book1,
-  Cpu,
-  Setting2,
-  TickCircle,
-  Warning2,
-} from "iconsax-react-nativejs";
-import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-
-function ModuleIcon({ name }: { name: ModuleMeta["icon"] }) {
-  const size = 72;
-  const color = "#0749FF";
-  switch (name) {
-    case "book":
-      return <Book1 size={size} variant="Bold" color={color} />;
-    case "cpu":
-      return <Cpu size={size} variant="Bold" color="#0B6B45" />;
-    case "gear":
-      return <Setting2 size={size} variant="Bold" color={color} />;
-    case "warning":
-      return <Warning2 size={size} variant="Bold" color="#0B6B45" />;
-    case "check":
-      return <TickCircle size={size} variant="Bold" color={color} />;
-  }
-}
-
-function ModuleCard({ module }: { module: ModuleMeta }) {
-  const router = useRouter();
-  return (
-    <Pressable
-      onPress={() => {
-        router.push(module.route as any);
-        console.log(`Navigating to ${module.route}`);
-      }}
-      android_ripple={{ color: "#E2E2E8" }}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-    >
-      <View style={[styles.cardHeader, { backgroundColor: module.accent }]}>
-        <ModuleIcon name={module.icon} />
-      </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.cardTitle}>
-          {module.index} {module.title.toUpperCase()}
-        </Text>
-        <Text style={styles.cardBlurb}>{module.blurb}</Text>
-      </View>
-    </Pressable>
-  );
-}
-
-export default function Training() {
-  return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.screen} edges={["top"]}>
-        <View style={styles.headerBlock}>
-          <Text style={styles.header}>Training</Text>
-          <Text style={styles.subHeader}>Get Familiar with the device</Text>
-        </View>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {MODULES.map((m) => (
-            <ModuleCard key={m.key} module={m} />
-          ))}
-        </ScrollView>
-      </SafeAreaView>
-    </SafeAreaProvider>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#F4F4F8",
-  },
-  headerBlock: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 18,
-    gap: 4,
-  },
-  header: {
-    fontSize: 16,
-    fontFamily: fontFamily.semibold,
-    color: "#1A1A1A",
-    letterSpacing: -0.4,
-  },
-  subHeader: {
-    fontSize: 13,
-    fontFamily: fontFamily.regular,
-    color: "#8A8A8A",
-    letterSpacing: -0.2,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 28,
-    gap: 20,
-  },
-  card: {
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
-  },
-  cardPressed: {
-    transform: [{ scale: 0.99 }],
-  },
-  cardHeader: {
-    height: 170,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cardBody: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 8,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontFamily: fontFamily.bold,
-    color: "#1A1A1A",
-    letterSpacing: -0.3,
-  },
-  cardBlurb: {
-    fontSize: 13,
-    fontFamily: fontFamily.regular,
-    color: "#8A8A8A",
-    lineHeight: 19,
-    letterSpacing: -0.2,
-  },
-});
 </file>
 
 <file path="app/arscene.tsx">
@@ -4477,6 +5703,230 @@ const styles = StyleSheet.create({
 });
 </file>
 
+<file path="components/vr-view.tsx">
+import {
+  Viro360Image,
+  Viro3DObject,
+  ViroARScene,
+  ViroAmbientLight,
+  ViroNode,
+  ViroSpotLight,
+} from "@reactvision/react-viro";
+import React from "react";
+
+export default function VRRoomScene() {
+  return (
+    <ViroARScene>
+      <Viro360Image source={require("@/assets/models/hospital_room.jpg")} />
+      <ViroAmbientLight color="#FFFFFF" intensity={500} />
+      <ViroSpotLight
+        position={[0, 5, 0]}
+        direction={[0, -1, 0]}
+        color="#ffffff"
+        intensity={800}
+      />
+      <ViroNode position={[0, -0.5, -2]}>
+        <Viro3DObject
+          source={require("@/assets/models/3D/nooosi.glb")}
+          type="GLB"
+          scale={[0.003, 0.003, 0.003]}
+          position={[0, -0.9, 0.5]}
+          onError={(e: any) => console.error("VR model error:", e)}
+        />
+      </ViroNode>
+    </ViroARScene>
+  );
+}
+</file>
+
+<file path="metro.config.js">
+const { getDefaultConfig } = require("expo/metro-config");
+
+const config = getDefaultConfig(__dirname);
+
+// SVG transformer — must come first
+config.transformer.babelTransformerPath = require.resolve(
+  "react-native-svg-transformer"
+);
+config.resolver.assetExts = config.resolver.assetExts.filter(
+  (ext) => ext !== "svg"
+);
+config.resolver.sourceExts.push("svg");
+
+// 3D model assets
+config.resolver.assetExts.push("obj", "mtl", "glb", "gltf");
+
+module.exports = config;
+</file>
+
+<file path="tsconfig.json">
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}
+</file>
+
+<file path="app/(tabs)/training.tsx">
+import { fontFamily } from "@/constants/fontFamily";
+import { MODULES, ModuleMeta } from "@/constants/training-content";
+import { useRouter } from "expo-router";
+import {
+  Book1,
+  Cpu,
+  Setting2,
+  TickCircle,
+  Warning2,
+} from "iconsax-react-nativejs";
+import React from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+
+function ModuleIcon({ name }: { name: ModuleMeta["icon"] }) {
+  const size = 72;
+  const color = "#0749FF";
+  switch (name) {
+    case "book":
+      return <Book1 size={size} variant="Bold" color={color} />;
+    case "cpu":
+      return <Cpu size={size} variant="Bold" color="#0B6B45" />;
+    case "gear":
+      return <Setting2 size={size} variant="Bold" color={color} />;
+    case "warning":
+      return <Warning2 size={size} variant="Bold" color="#0B6B45" />;
+    case "check":
+      return <TickCircle size={size} variant="Bold" color={color} />;
+  }
+}
+
+function ModuleCard({ module }: { module: ModuleMeta }) {
+  const router = useRouter();
+  return (
+    <Pressable
+      onPress={() => {
+        router.push(module.route as any);
+        console.log(`Navigating to ${module.route}`);
+      }}
+      android_ripple={{ color: "#E2E2E8" }}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+    >
+      <View style={[styles.cardHeader, { backgroundColor: module.accent }]}>
+        <ModuleIcon name={module.icon} />
+      </View>
+      <View style={styles.cardBody}>
+        <Text style={styles.cardTitle}>
+          {module.index} {module.title.toUpperCase()}
+        </Text>
+        <Text style={styles.cardBlurb}>{module.blurb}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+export default function Training() {
+  return (
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.screen} edges={["top"]}>
+        <View style={styles.headerBlock}>
+          <Text style={styles.header}>Training</Text>
+          <Text style={styles.subHeader}>Get Familiar with the device</Text>
+        </View>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {MODULES.map((m) => (
+            <ModuleCard key={m.key} module={m} />
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    </SafeAreaProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#F4F4F8",
+  },
+  headerBlock: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 18,
+    gap: 4,
+  },
+  header: {
+    fontSize: 16,
+    fontFamily: fontFamily.semibold,
+    color: "#1A1A1A",
+    letterSpacing: -0.4,
+  },
+  subHeader: {
+    fontSize: 13,
+    fontFamily: fontFamily.regular,
+    color: "#8A8A8A",
+    letterSpacing: -0.2,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 28,
+    gap: 20,
+  },
+  card: {
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
+  },
+  cardPressed: {
+    transform: [{ scale: 0.99 }],
+  },
+  cardHeader: {
+    height: 170,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardBody: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontFamily: fontFamily.bold,
+    color: "#1A1A1A",
+    letterSpacing: -0.3,
+  },
+  cardBlurb: {
+    fontSize: 13,
+    fontFamily: fontFamily.regular,
+    color: "#8A8A8A",
+    lineHeight: 19,
+    letterSpacing: -0.2,
+  },
+});
+</file>
+
 <file path="components/setpoint-temperature.tsx">
 import { fontFamily } from "@/constants/fontFamily";
 import React, { useRef, useState } from "react";
@@ -4733,82 +6183,6 @@ const styles = StyleSheet.create({
 });
 </file>
 
-<file path="components/vr-view.tsx">
-import {
-  Viro360Image,
-  Viro3DObject,
-  ViroARScene,
-  ViroAmbientLight,
-  ViroNode,
-  ViroSpotLight,
-} from "@reactvision/react-viro";
-import React from "react";
-
-export default function VRRoomScene() {
-  return (
-    <ViroARScene>
-      <Viro360Image source={require("@/assets/models/hospital_room.jpg")} />
-      <ViroAmbientLight color="#FFFFFF" intensity={500} />
-      <ViroSpotLight
-        position={[0, 5, 0]}
-        direction={[0, -1, 0]}
-        color="#ffffff"
-        intensity={800}
-      />
-      <ViroNode position={[0, -0.5, -2]}>
-        <Viro3DObject
-          source={require("@/assets/models/neonatalXR.glb")}
-          type="GLB"
-          scale={[1.6, 1.6, 1.6]}
-          position={[0, -0.9, 0]}
-          onError={(e: any) => console.error("VR model error:", e)}
-        />
-      </ViroNode>
-    </ViroARScene>
-  );
-}
-</file>
-
-<file path="metro.config.js">
-const { getDefaultConfig } = require("expo/metro-config");
-
-const config = getDefaultConfig(__dirname);
-
-// SVG transformer — must come first
-config.transformer.babelTransformerPath = require.resolve(
-  "react-native-svg-transformer"
-);
-config.resolver.assetExts = config.resolver.assetExts.filter(
-  (ext) => ext !== "svg"
-);
-config.resolver.sourceExts.push("svg");
-
-// 3D model assets
-config.resolver.assetExts.push("obj", "mtl", "glb", "gltf");
-
-module.exports = config;
-</file>
-
-<file path="tsconfig.json">
-{
-  "extends": "expo/tsconfig.base",
-  "compilerOptions": {
-    "strict": true,
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    }
-  },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-  ]
-}
-</file>
-
 <file path="app/(tabs)/index.tsx">
 import Power from "@/assets/images/Power.svg";
 import HumidityCard from "@/components/humidity-card";
@@ -4823,8 +6197,9 @@ import {
   fmt,
   HUMIDITY_RANGE,
 } from "@/lib/parameter-state";
+import { sendDeviceCommand } from "@/lib/supabase";
 import { CloudAdd } from "iconsax-react-nativejs";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 // Visual fill bounds for the bars.
@@ -4873,9 +6248,16 @@ export default function HomeScreen() {
             </View>
             <View style={styles.iconContainer}>
               <CloudAdd variant="Bold" color={statusColor} size={36} />
-              <View>
+              <Pressable
+                onPress={() => {
+                  sendDeviceCommand(
+                    "SYSTEM_ENABLE",
+                    row?.system_enabled ? 0 : 1
+                  );
+                }}
+              >
                 <Power />
-              </View>
+              </Pressable>
             </View>
           </View>
 
@@ -4927,6 +6309,7 @@ export default function HomeScreen() {
               title="SETPOINT TEMPERATURE"
               temperature={setTarget}
               state="normal"
+              onUpdate={(value) => sendDeviceCommand("SET_TEMP", value)}
             />
           </ScrollView>
         </View>
@@ -5416,114 +6799,6 @@ const styles = StyleSheet.create({
 });
 </file>
 
-<file path="components/temperature-card.tsx">
-import { fontFamily } from "@/constants/fontFamily";
-import { StyleSheet, Text, View } from "react-native";
-import TemperatureBar from "./temperature-bar";
-
-export interface TemperatureCardProps {
-  title: string;
-  temperature: number;
-  state: string;
-  // Visual fill bounds for the bar.
-  rangeMin?: number;
-  rangeMax?: number;
-  // Clinical normal band for the color (defaults handled in the bar).
-  normalMin?: number;
-  normalMax?: number;
-  // Copy describing the expected range.
-  expectedLabel?: string;
-  // Noun used in the sentence, e.g. "core" or "ambient".
-  metricNoun?: string;
-}
-
-export function TemperatureCard({
-  title,
-  temperature,
-  state,
-  rangeMin,
-  rangeMax,
-  normalMin,
-  normalMax,
-  expectedLabel = "36.5°C - 36.7°C",
-  metricNoun = "core",
-}: TemperatureCardProps) {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.title}>{title}</Text>
-      <View style={styles.tempValue}>
-        <Text style={styles.value}>{temperature}</Text>
-        <Text style={styles.unit}>°C</Text>
-      </View>
-      <TemperatureBar
-        temperature={temperature}
-        rangeMin={rangeMin}
-        rangeMax={rangeMax}
-        normalMin={normalMin}
-        normalMax={normalMax}
-      />
-      <View style={styles.tempValue}>
-        <Text style={styles.text}>
-          Average value should be between{" "}
-          <Text style={styles.highlight}>{expectedLabel}</Text>. The current{" "}
-          {metricNoun} temperature is{" "}
-          <Text style={styles.highlightTwo}>{state}</Text>
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 0.5,
-    borderColor: "#F0F0F0",
-    gap: 14,
-  },
-  title: {
-    fontSize: 11,
-    fontFamily: fontFamily.medium,
-    paddingHorizontal: 5,
-    paddingVertical: 3,
-    color: "#575757",
-    backgroundColor: "#EEEEEE",
-    alignSelf: "flex-start",
-    borderRadius: 3,
-  },
-  tempValue: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 4,
-  },
-  unit: {
-    fontSize: 14,
-    fontFamily: fontFamily.medium,
-    marginTop: 4,
-  },
-  value: {
-    fontSize: 28,
-    fontFamily: fontFamily.bold,
-  },
-  text: {
-    fontSize: 12,
-    fontFamily: fontFamily.medium,
-    lineHeight: 16,
-    color: "#A0A0A0",
-  },
-  highlight: {
-    fontFamily: fontFamily.semibold,
-    color: "#393939",
-  },
-  highlightTwo: {
-    fontFamily: fontFamily.semibold,
-    color: "#00A16C",
-  },
-});
-</file>
-
 <file path="app/(tabs)/arview.tsx">
 import ARSVG from "@/assets/images/AR.svg";
 import VRSVG from "@/assets/images/VR.svg";
@@ -5572,6 +6847,18 @@ const cards = [
     buttonText: "LAUNCH VR",
     colors: ["#00A651", "#005C2E"] as const,
     dotColor: "#00A651",
+    icon: "glasses-outline" as const,
+  },
+
+  {
+    id: "electricalVr",
+    title: "Electrical\nSimulation",
+    description:
+      "Check your camera permission first. Then you can try to interact with the 3D model in your virtual environment.",
+    route: "/electricVr",
+    buttonText: "LAUNCH VR",
+    colors: ["#b871ff", "#9c39ff"] as const,
+    dotColor: "#b871ff",
     icon: "glasses-outline" as const,
   },
 ];
@@ -5872,6 +7159,114 @@ const styles = StyleSheet.create({
 });
 </file>
 
+<file path="components/temperature-card.tsx">
+import { fontFamily } from "@/constants/fontFamily";
+import { StyleSheet, Text, View } from "react-native";
+import TemperatureBar from "./temperature-bar";
+
+export interface TemperatureCardProps {
+  title: string;
+  temperature: number;
+  state: string;
+  // Visual fill bounds for the bar.
+  rangeMin?: number;
+  rangeMax?: number;
+  // Clinical normal band for the color (defaults handled in the bar).
+  normalMin?: number;
+  normalMax?: number;
+  // Copy describing the expected range.
+  expectedLabel?: string;
+  // Noun used in the sentence, e.g. "core" or "ambient".
+  metricNoun?: string;
+}
+
+export function TemperatureCard({
+  title,
+  temperature,
+  state,
+  rangeMin,
+  rangeMax,
+  normalMin,
+  normalMax,
+  expectedLabel = "36.5°C - 36.7°C",
+  metricNoun = "core",
+}: TemperatureCardProps) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.title}>{title}</Text>
+      <View style={styles.tempValue}>
+        <Text style={styles.value}>{temperature}</Text>
+        <Text style={styles.unit}>°C</Text>
+      </View>
+      <TemperatureBar
+        temperature={temperature}
+        rangeMin={rangeMin}
+        rangeMax={rangeMax}
+        normalMin={normalMin}
+        normalMax={normalMax}
+      />
+      <View style={styles.tempValue}>
+        <Text style={styles.text}>
+          Average value should be between{" "}
+          <Text style={styles.highlight}>{expectedLabel}</Text>. The current{" "}
+          {metricNoun} temperature is{" "}
+          <Text style={styles.highlightTwo}>{state}</Text>
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 0.5,
+    borderColor: "#F0F0F0",
+    gap: 14,
+  },
+  title: {
+    fontSize: 11,
+    fontFamily: fontFamily.medium,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+    color: "#575757",
+    backgroundColor: "#EEEEEE",
+    alignSelf: "flex-start",
+    borderRadius: 3,
+  },
+  tempValue: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 4,
+  },
+  unit: {
+    fontSize: 14,
+    fontFamily: fontFamily.medium,
+    marginTop: 4,
+  },
+  value: {
+    fontSize: 28,
+    fontFamily: fontFamily.bold,
+  },
+  text: {
+    fontSize: 12,
+    fontFamily: fontFamily.medium,
+    lineHeight: 16,
+    color: "#A0A0A0",
+  },
+  highlight: {
+    fontFamily: fontFamily.semibold,
+    color: "#393939",
+  },
+  highlightTwo: {
+    fontFamily: fontFamily.semibold,
+    color: "#00A16C",
+  },
+});
+</file>
+
 <file path="app.json">
 {
   "expo": {
@@ -6075,6 +7470,14 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="electricVr"
+            options={{
+              animation: "slide_from_right",
+              gestureEnabled: false,
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
             name="training/components"
             options={{
               animation: "slide_from_right",
@@ -6106,6 +7509,17 @@ export default function RootLayout() {
               headerBackButtonDisplayMode: "minimal",
               headerTransparent: true,
               headerTitle: "MODULE ONE",
+              headerTitleStyle: { color: "#000", fontWeight: "bold" },
+            }}
+          />
+          <Stack.Screen
+            name="training/assessment"
+            options={{
+              animation: "slide_from_right",
+              headerShown: true,
+              headerBackButtonDisplayMode: "minimal",
+              headerTransparent: true,
+              headerTitle: "MODULE FOUR",
               headerTitleStyle: { color: "#000", fontWeight: "bold" },
             }}
           />

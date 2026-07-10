@@ -21,10 +21,10 @@ export default function VRRoomScene() {
       />
       <ViroNode position={[0, -0.5, -2]}>
         <Viro3DObject
-          source={require("@/assets/models/neonatalXR.glb")}
+          source={require("@/assets/models/3D/nooosi.glb")}
           type="GLB"
-          scale={[1.6, 1.6, 1.6]}
-          position={[0, -0.9, 0]}
+          scale={[0.003, 0.003, 0.003]}
+          position={[0, -0.9, 0.5]}
           onError={(e: any) => console.error("VR model error:", e)}
         />
       </ViroNode>
