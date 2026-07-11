@@ -1,0 +1,47 @@
+# Mirrors .gitignore, EXCEPT it deliberately does NOT exclude .glb/.obj/.mtl/
+# .hdr/.exr -- those are gitignored to keep the git repo lean, but EAS Build
+# actually needs the real binaries present to resolve Viro3DObject require()
+# calls at bundle time. If this file exists, EAS uses it INSTEAD OF
+# .gitignore when deciding what to upload for a build.
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+app-example
+
+# generated native folders
+/ios
+/android

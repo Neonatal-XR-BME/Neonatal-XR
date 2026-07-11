@@ -1,11 +1,14 @@
 import {
+  Viro3DObject,
   ViroAmbientLight,
   ViroARImageMarker,
   ViroARScene,
   ViroARSceneNavigator,
   ViroARTrackingTargets,
   ViroMaterials,
+  ViroNode,
   ViroSpotLight,
+  ViroText,
 } from "@reactvision/react-viro";
 import { router } from "expo-router";
 import React, { useRef, useState } from "react";
@@ -116,7 +119,7 @@ function NeonatalARScene() {
         onAnchorFound={() => setModelVisible(true)}
         onAnchorRemoved={() => setModelVisible(false)}
       >
-        {/* {modelVisible && (
+        {modelVisible && (
           <ViroNode position={position}>
             <Viro3DObject
               source={require("@/assets/models/neonatalXR.glb")}
@@ -137,7 +140,7 @@ function NeonatalARScene() {
               onClick={resetModel}
             />
           </ViroNode>
-        )} */}
+        )}
       </ViroARImageMarker>
     </ViroARScene>
   );
