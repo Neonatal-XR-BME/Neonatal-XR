@@ -70,7 +70,7 @@ export function useLiveParameters() {
     });
 
     const channel = supabase
-      .channel("parameters-live")
+      .channel(`parameters-live-${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: PARAMETERS_TABLE },
