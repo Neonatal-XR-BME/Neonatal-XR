@@ -19,6 +19,28 @@ export type ConnectionState = "connecting" | "live" | "offline";
 // Poll fallback interval (ms) used if realtime isn't available.
 const POLL_MS = 5000;
 
+// How long a reading can sit without a newer one arriving before we call
+// the device offline, rather than just "still connected to Supabase".
+// Normal device sync runs ~2-3s, so this leaves real headroom before
+// flagging anything as stale.
+const STALE_MS = 15000;
+
+// How often staleness gets re-checked. This has to be a ticking interval,
+// not just logic that reruns when `row` changes -- if the device actually
+// goes quiet, `row` stops updating entirely, so anything only keyed off a
+// `row` change would never notice and would keep showing the last state
+// forever.
+const STALE_CHECK_MS = 2000;
+
+// device_timestamp comes in as Unix seconds (e.g. 1784385125), Date.now()
+// is milliseconds -- this normalizes either.
+function toMillis(ts: string | number | null): number | null {
+  if (ts === null || ts === undefined) return null;
+  const n = typeof ts === "string" ? Number(ts) : ts;
+  if (!Number.isFinite(n)) return null;
+  return n < 1e12 ? n * 1000 : n;
+}
+
 async function fetchLatest(): Promise<ParameterRow | null> {
   const { data, error } = await supabase
     .from(PARAMETERS_TABLE)
@@ -39,11 +61,19 @@ async function fetchLatest(): Promise<ParameterRow | null> {
  * Strategy: fetch the latest row immediately on mount so the UI has data, then
  * open a realtime channel for INSERT/UPDATE pushes. If realtime never reaches
  * SUBSCRIBED (table not enabled for realtime, network), fall back to polling.
+ *
+ * "live" requires BOTH a subscribed channel AND a recent device_timestamp.
+ * A subscribed channel only tells you the phone is talking to Supabase --
+ * it says nothing about whether the physical device is still reporting.
+ * Without the freshness check, status shows "Online" forever off the last
+ * row ever received, even long after the device itself has gone quiet.
  */
 export function useLiveParameters() {
   const [row, setRow] = useState<ParameterRow | null>(null);
   const [status, setStatus] = useState<ConnectionState>("connecting");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rowRef = useRef<ParameterRow | null>(null);
+  const channelConnectedRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -52,7 +82,10 @@ export function useLiveParameters() {
       if (pollRef.current) return;
       pollRef.current = setInterval(async () => {
         const latest = await fetchLatest();
-        if (mounted && latest) setRow(latest);
+        if (mounted && latest) {
+          rowRef.current = latest;
+          setRow(latest);
+        }
       }, POLL_MS);
     };
 
@@ -66,7 +99,10 @@ export function useLiveParameters() {
     fetchLatest().then((latest) => {
       if (!mounted) return;
       console.log("[INITIAL] latest row:", JSON.stringify(latest, null, 2));
-      if (latest) setRow(latest);
+      if (latest) {
+        rowRef.current = latest;
+        setRow(latest);
+      }
     });
 
     const channel = supabase
@@ -81,28 +117,50 @@ export function useLiveParameters() {
             JSON.stringify(payload.new, null, 2)
           );
           const next = payload.new as ParameterRow;
-          if (next) setRow(next);
+          if (next) {
+            rowRef.current = next;
+            setRow(next);
+          }
         }
       )
       .subscribe((channelStatus) => {
         console.log("[REALTIME] channel status:", channelStatus);
         if (!mounted) return;
         if (channelStatus === "SUBSCRIBED") {
-          setStatus("live");
+          channelConnectedRef.current = true;
           stopPolling();
         } else if (
           channelStatus === "CHANNEL_ERROR" ||
           channelStatus === "TIMED_OUT" ||
           channelStatus === "CLOSED"
         ) {
-          setStatus("offline");
+          channelConnectedRef.current = false;
           startPolling();
         }
       });
 
+    // Ticks independently of both the channel and `row` -- this is the
+    // piece that actually catches "device went quiet". A subscribed
+    // channel + a stale row still counts as offline.
+    const staleCheck = setInterval(() => {
+      if (!mounted) return;
+
+      const currentRow = rowRef.current;
+      if (!currentRow) {
+        setStatus("connecting");
+        return;
+      }
+
+      const ts = toMillis(currentRow.device_timestamp);
+      const fresh = ts !== null && Date.now() - ts <= STALE_MS;
+
+      setStatus(channelConnectedRef.current && fresh ? "live" : "offline");
+    }, STALE_CHECK_MS);
+
     return () => {
       mounted = false;
       stopPolling();
+      clearInterval(staleCheck);
       supabase.removeChannel(channel);
     };
   }, []);

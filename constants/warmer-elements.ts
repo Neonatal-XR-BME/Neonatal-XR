@@ -100,7 +100,8 @@ export const WARMER_ELEMENTS: Record<ElementId, WarmerElement> = {
     restPosition: [0, 0, 0],
     explodeOffset: [0, -15, 0], // fixed anchor of the assembly, like "stand" in the old model
     explodeDelay: 300,
-    notes: "HIGH POLY -- decimate before use in AR (see file header).",
+    notes:
+      "The wheeled base the whole warmer stands on. Lockable casters let staff roll the unit between rooms and hold it steady at the bedside.",
   },
 
   support_frame: {
@@ -122,7 +123,7 @@ export const WARMER_ELEMENTS: Record<ElementId, WarmerElement> = {
     explodeOffset: [0, -10, 0], // likely near-anchor like wheels, revisit once geometry is known
     explodeDelay: 400,
     notes:
-      "Waiting on Support_Frame.obj. Recompute bbox/centroid/restPosition once received.",
+      "The vertical column that carries the load from the base up to the bassinet and heater head, holding the radiant warmer at the right height above the baby.",
   },
 
   real_bed_bassinet: {
@@ -142,7 +143,7 @@ export const WARMER_ELEMENTS: Record<ElementId, WarmerElement> = {
     explodeOffset: [0, 40, 0], // slides toward the front (-X) with the shields
     explodeDelay: 400,
     notes:
-      "See ASSEMBLY FRAME note -- offset is inferred from bbox matching, not exported position.",
+      "The padded platform the newborn lies on. Positioned directly under the radiant heater so warmth reaches the baby evenly, and sized to keep the infant within reach for care.",
   },
 
   bassinet_shields: {
@@ -169,7 +170,7 @@ export const WARMER_ELEMENTS: Record<ElementId, WarmerElement> = {
     explodeOffset: [0, 0, 0], // slides toward the front (-X), same direction as the mattress
     explodeDelay: 400,
     notes:
-      "Named groups (back/front/left/right/base) are ready-made hotspot targets if you want per-panel focus later.",
+      "Clear acrylic walls on all four sides of the bassinet. They stop the baby from rolling out, cut down on draughts, and stay transparent so staff keep a full view of the infant.",
   },
 
   control_board: {
@@ -193,7 +194,7 @@ export const WARMER_ELEMENTS: Record<ElementId, WarmerElement> = {
     explodeOffset: [0, 0, 20], // pulls out along Y, its thin/mount axis
     explodeDelay: 200,
     notes:
-      "Individually-colored LED materials (Red/Green/Blue) -- could drive real-time alarm-state visuals later, tying into the live Supabase parameters.",
+      "The operator's interface. Its display and status LEDs show the set and measured temperature, and the controls let staff adjust the target and respond to alarms.",
   },
 
   collimator_support: {
@@ -214,7 +215,7 @@ export const WARMER_ELEMENTS: Record<ElementId, WarmerElement> = {
     explodeOffset: [0, 32, 0], // lifts up (+Z) with the heater head
     explodeDelay: 400,
     notes:
-      "HIGH POLY -- decimate before use in AR (see file header). Very thin in Y (2 units) -- likely the rail the heater head slides on, not the main column.",
+      "The arm that holds the radiant heater head out over the mattress, keeping the heat source aimed down at the baby from a safe, fixed distance.",
   },
 
   collimator_dissemble: {
@@ -231,7 +232,8 @@ export const WARMER_ELEMENTS: Record<ElementId, WarmerElement> = {
     restPosition: [0, 0, 0],
     explodeOffset: [0, 30, 0], // lifts up (+Z), further than the rail beneath it
     explodeDelay: 600,
-    notes: "Topmost element in the assembly (highest z-range of any part).",
+    notes:
+      "The radiant heater at the top of the unit. It delivers infrared warmth down onto the mattress, and the controller drives it to hold the baby's temperature at the set point.",
   },
 };
 

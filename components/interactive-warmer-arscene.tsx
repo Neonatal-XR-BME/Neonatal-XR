@@ -309,9 +309,9 @@ import React, { useEffect, useRef, useState } from "react";
 
 ViroARTrackingTargets.createTargets({
   logo: {
-    source: require("@/assets/models/imgggg.webp"),
+    source: require("@/assets/models/logo.webp"),
     orientation: "Up",
-    physicalWidth: 0.1,
+    physicalWidth: 0.5,
   },
 });
 

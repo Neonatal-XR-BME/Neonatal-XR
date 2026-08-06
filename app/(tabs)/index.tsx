@@ -1,7 +1,7 @@
-import Power from "@/assets/images/Power.svg";
 import HumidityCard from "@/components/humidity-card";
 import { SetPointCard } from "@/components/setpoint-temperature";
 import { TemperatureCard } from "@/components/temperature-card";
+import { ToggleSwitch } from "@/components/toggle-switch";
 import { fontFamily } from "@/constants/fontFamily";
 import { useLiveParameters } from "@/hooks/use-live-parameters";
 import {
@@ -13,7 +13,8 @@ import {
 } from "@/lib/parameter-state";
 import { sendDeviceCommand } from "@/lib/supabase";
 import { CloudAdd } from "iconsax-react-nativejs";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 // Visual fill bounds for the bars.
@@ -25,10 +26,60 @@ const AMBIENT_FILL_MAX = 26;
 export default function HomeScreen() {
   const { row, status } = useLiveParameters();
 
+  // Single source of truth for "is it actually safe to send a command
+  // right now" -- reused by both the toggle and the setpoint control below.
+  const isOnline = status === "live";
+
   const core = fmt(row?.core_temp ?? null);
   const ambient = fmt(row?.ambient_temp ?? null);
   const humidity = fmt(row?.humidity ?? null, 0);
   const setTarget = fmt(row?.set_target ?? null);
+
+  // Ground truth from the device.
+  const isSystemOn = !!row?.system_enabled;
+
+  // What the switch actually shows. Real device sync takes ~2-3s, so
+  // without this the switch just sits still until that round-trip
+  // finishes -- which reads as "not toggling" even though the command did
+  // go out. This flips instantly on tap, then re-syncs to the real value
+  // whenever a fresh reading comes in, so it still reflects the device's
+  // actual state once confirmed (or snaps back if the command didn't
+  // actually take).
+  const [displayOn, setDisplayOn] = useState(isSystemOn);
+
+  useEffect(() => {
+    setDisplayOn(isSystemOn);
+  }, [isSystemOn]);
+
+  const handleToggle = async (next: boolean) => {
+    if (!isOnline) {
+      Alert.alert(
+        "Device Offline",
+        "Can't change power state right now -- the device isn't reporting in."
+      );
+      return; // don't flip the switch, nothing was actually sent
+    }
+    setDisplayOn(next); // optimistic -- safe now, we know isOnline was true
+    const result = await sendDeviceCommand(
+      "SYSTEM_ENABLE",
+      next ? 1 : 0,
+      isOnline
+    );
+    if (!result.sent) {
+      setDisplayOn(isSystemOn); // revert if it didn't actually go out
+    }
+  };
+
+  const handleSetTarget = (value: number) => {
+    if (!isOnline) {
+      Alert.alert(
+        "Device Offline",
+        "Can't update the setpoint right now -- the device isn't reporting in."
+      );
+      return;
+    }
+    sendDeviceCommand("SET_TEMP", value, isOnline);
+  };
 
   const coreFillMax =
     setTarget > CORE_FILL_MIN ? setTarget : CORE_FILL_FALLBACK_MAX;
@@ -62,16 +113,11 @@ export default function HomeScreen() {
             </View>
             <View style={styles.iconContainer}>
               <CloudAdd variant="Bold" color={statusColor} size={36} />
-              <Pressable
-                onPress={() => {
-                  sendDeviceCommand(
-                    "SYSTEM_ENABLE",
-                    row?.system_enabled ? 0 : 1
-                  );
-                }}
-              >
-                <Power />
-              </Pressable>
+              <ToggleSwitch
+                value={displayOn}
+                onValueChange={handleToggle}
+                disabled={!isOnline}
+              />
             </View>
           </View>
 
@@ -123,7 +169,7 @@ export default function HomeScreen() {
               title="SETPOINT TEMPERATURE"
               temperature={setTarget}
               state="normal"
-              onUpdate={(value) => sendDeviceCommand("SET_TEMP", value)}
+              onUpdate={handleSetTarget}
             />
           </ScrollView>
         </View>

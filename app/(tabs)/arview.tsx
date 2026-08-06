@@ -10,6 +10,7 @@ import {
   Dimensions,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -41,7 +42,7 @@ const cards = [
     title: "Virtual\nReality (VR)\nView",
     description:
       "Check your camera permission first. Then you can try to interact with the 3D model in your virtual environment.",
-    route: "/vrscene",
+    route: `${Platform.OS === "android" ? "/mobilevr" : "/vrscene"}`,
     buttonText: "LAUNCH VR",
     colors: ["#00A651", "#005C2E"] as const,
     dotColor: "#00A651",
@@ -52,9 +53,9 @@ const cards = [
     id: "electricalVr",
     title: "Electrical\nSimulation",
     description:
-      "Check your camera permission first. Then you can try to interact with the 3D model in your virtual environment.",
+      "Pinch to zoom, drag to pan, tap a part for details. This is a flat schematic viewer of the electrical layout of the neonatal warmer.",
     route: "/electricVr",
-    buttonText: "LAUNCH VR",
+    buttonText: "CHECK SCHEMATIC",
     colors: ["#b871ff", "#9c39ff"] as const,
     dotColor: "#b871ff",
     icon: "glasses-outline" as const,
